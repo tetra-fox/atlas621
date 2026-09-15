@@ -1,0 +1,10 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "fd621",
+  "compatibility_date": "2026-09-11",
+  "assets": {
+    "directory": "./build"
+  },
+  "workers_dev": false,
+  "preview_urls": false
+}

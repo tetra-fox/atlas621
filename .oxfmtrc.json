@@ -1,0 +1,18 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "useTabs": false,
+  "singleQuote": false,
+  "trailingComma": "none",
+  "semi": true,
+  "endOfLine": "lf",
+  "bracketSameLine": true,
+  "printWidth": 100,
+  "quoteProps": "consistent",
+  "svelte": true,
+  "sortImports": true,
+  "sortTailwindcss": {
+    "stylesheet": "./src/app.css"
+  },
+  "sortPackageJson": false,
+  "ignorePatterns": ["pnpm-lock.yaml", "/static/"]
+}

@@ -1,0 +1,7 @@
+packages: []
+allowBuilds:
+  esbuild: true
+  workerd: true
+  "@tailwindcss/oxide": true
+  sharp: true
+minimumReleaseAge: 1440
