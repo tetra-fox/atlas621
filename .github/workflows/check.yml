@@ -29,6 +29,6 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: pipeline
-      - run: cargo fmt --check --manifest-path pipeline/Cargo.toml
+      - run: cargo fmt --all --check --manifest-path pipeline/Cargo.toml
       - run: cargo clippy --manifest-path pipeline/Cargo.toml --all-targets -- -D warnings
       - run: cargo test --release --manifest-path pipeline/Cargo.toml
