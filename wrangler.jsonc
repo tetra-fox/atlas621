@@ -1,9 +1,10 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "fd621",
+  "name": "atlas621",
   "compatibility_date": "2026-09-11",
   "assets": {
-    "directory": "./build"
+    "directory": "./build",
+    "not_found_handling": "single-page-application"
   },
   "workers_dev": false,
   "preview_urls": false

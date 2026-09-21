@@ -1,7 +1,6 @@
 .DS_Store
 node_modules
 
-# Output
 .output
 .vercel
 .netlify
@@ -9,25 +8,26 @@ node_modules
 /.svelte-kit
 /package
 
-# Env
 .env
 .env.*
 !.env.example
 !.env.test
 
-# Vite
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 
-# Cloudflare types
 /worker-configuration.d.ts
 
-# wrangler files
 .wrangler
 .dev.vars*
 !.dev.vars.example
 
-# nix
 .direnv
 result
 result-*
+
+/static/data
+/pipeline/target
+/pipeline/work
+/experiment
+/static/data-*

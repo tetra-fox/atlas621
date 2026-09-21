@@ -1,7 +1,148 @@
 @import "tailwindcss";
 
+@theme {
+  --font-sans: "DejaVu Sans", sans-serif;
+  --font-mono: "Source Code Pro Variable", "Source Code Pro", ui-monospace, monospace;
+  --text-xs--line-height: 1.25;
+  --text-sm--line-height: 1.25;
+  --text-base--line-height: 1.25;
+
+  --color-ground: #020f23;
+  --color-page: #152f56;
+  --color-page-dim: #0a1629;
+  --color-section: #1f3c67;
+  --color-section-light: #25477b;
+  --color-section-lighter: #2b538e;
+  --color-section-dark: #193153;
+
+  --color-ink: #ffffff;
+  --color-muted: #999999;
+  --color-link: #b4c7d9;
+  --color-link-hover: #e9f2fa;
+  --color-accent: #e8c446;
+
+  --color-field: #ffffff;
+  --color-field-focus: #ffffcc;
+  --color-field-ink: #000000;
+
+  --color-safe: #3e9e49;
+  --color-questionable: #ffe066;
+  --color-explicit: #e45f5f;
+  --color-safe-fill: #227d2a;
+  --color-questionable-fill: #827428;
+  --color-explicit-fill: #76312e;
+
+  --color-mark: #01549d;
+
+  --radius-page: 6px;
+  --default-transition-duration: 75ms;
+  --default-transition-timing-function: ease-out;
+  --inset-shadow-track: inset 0 0 0.25rem rgb(0 0 0 / 0.38);
+  --shadow-drop: 0 0.25rem 0.5rem -0.25rem var(--color-ground);
+}
+
+@utility hex-ground {
+  background-color: var(--color-ground);
+  background-image: var(--hex-ground);
+}
+
+@utility hex-strip {
+  isolation: isolate;
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    pointer-events: none;
+    background-image: var(--hex-tile);
+    background-position: var(--hex-x, 0px) var(--hex-y, 0px);
+    mask-image: var(--hex-fade);
+  }
+}
+
+@utility btn {
+  @apply inline-flex items-center justify-center gap-1 rounded-sm bg-section-light px-2 py-1 text-ink hover:bg-section-lighter active:bg-section disabled:opacity-40;
+}
+
+@utility tag-chip {
+  @apply flex items-center rounded-sm border-2 border-l-4 border-section-light bg-section transition-colors hover:bg-section-light active:bg-section-dark;
+  border-left-color: var(--tag);
+  &:hover {
+    border-left-color: var(--tag-alt);
+  }
+}
+
 @layer base {
+  :root {
+    --hex-ground: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='74' height='44'%3E%3Cpath d='M12.33 22L24.67 0L49.33 0L61.67 22L49.33 44L24.67 44ZM-24.67 0L-12.33 -22L12.33 -22L24.67 0L12.33 22L-12.33 22ZM49.33 0L61.67 -22L86.33 -22L98.67 0L86.33 22L61.67 22ZM-24.67 44L-12.33 22L12.33 22L24.67 44L12.33 66L-12.33 66ZM49.33 44L61.67 22L86.33 22L98.67 44L86.33 66L61.67 66Z' fill='none' stroke='white' stroke-opacity='.025' stroke-width='3'/%3E%3Cpath d='M14.73 22L25.87 2.09L48.13 2.09L59.27 22L48.13 41.91L25.87 41.91ZM-22.27 0L-11.13 -19.91L11.13 -19.91L22.27 0L11.13 19.91L-11.13 19.91ZM51.73 0L62.87 -19.91L85.13 -19.91L96.27 0L85.13 19.91L62.87 19.91ZM-22.27 44L-11.13 24.09L11.13 24.09L22.27 44L11.13 63.91L-11.13 63.91ZM51.73 44L62.87 24.09L85.13 24.09L96.27 44L85.13 63.91L62.87 63.91Z' fill='none' stroke='black' stroke-opacity='.14' stroke-width='1.2'/%3E%3C/svg%3E");
+    --hex-tile: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='30' height='17.32'%3E%3Cpath d='M-9 -16.32H1L6 -7.66L1 1M-9 1H1L6 9.66L1 18.32M-9 18.32H1L6 26.98L1 35.64M21 -16.32H31L36 -7.66L31 1M21 1H31L36 9.66L31 18.32M21 18.32H31L36 26.98L31 35.64M6 -24.98H16L21 -16.32L16 -7.66M6 -7.66H16L21 1L16 9.66M6 9.66H16L21 18.32L16 26.98M36 -24.98H46L51 -16.32L46 -7.66M36 -7.66H46L51 1L46 9.66M36 9.66H46L51 18.32L46 26.98' fill='none' stroke='black' stroke-opacity='0.14' stroke-width='3'/%3E%3C/svg%3E");
+    --hex-fade: linear-gradient(
+      to bottom,
+      rgb(0 0 0 / 1) 0px,
+      rgb(0 0 0 / 1) 45px,
+      rgb(0 0 0 / 0.86) 45px,
+      rgb(0 0 0 / 0.86) 68px,
+      rgb(0 0 0 / 0.71) 68px,
+      rgb(0 0 0 / 0.71) 87px,
+      rgb(0 0 0 / 0.54) 87px,
+      rgb(0 0 0 / 0.54) 109px,
+      rgb(0 0 0 / 0.43) 109px,
+      rgb(0 0 0 / 0.43) 120px,
+      rgb(0 0 0 / 0.31) 120px,
+      rgb(0 0 0 / 0.31) 131px,
+      rgb(0 0 0 / 0.26) 131px,
+      rgb(0 0 0 / 0.26) 143px,
+      rgb(0 0 0 / 0.14) 143px,
+      rgb(0 0 0 / 0.14) 174px,
+      rgb(0 0 0 / 0) 174px
+    );
+  }
   html {
     @apply antialiased;
+    color-scheme: dark;
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--color-link) 60%, transparent) transparent;
+  }
+  ::selection {
+    background-color: var(--color-mark);
+    color: var(--color-ink);
+  }
+  :where(
+    a,
+    button,
+    input,
+    [role="option"],
+    [role="slider"],
+    [role="switch"],
+    [role="radio"]
+  ):focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 1px;
+  }
+  body {
+    @apply hex-ground text-sm text-ink;
+  }
+  a {
+    @apply text-link hover:text-link-hover active:text-accent;
+  }
+  button:not(:disabled) {
+    cursor: pointer;
+  }
+  :where(a, button, input, select, [role="option"], [role="slider"]) {
+    transition-property: color, background-color, border-color, box-shadow, filter, opacity, scale;
+    transition-duration: var(--default-transition-duration);
+    transition-timing-function: var(--default-transition-timing-function);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    :where(a, button, input, select, [role="option"], [role="slider"]) {
+      transition-duration: 0s;
+    }
+  }
+  input:where(:not([type]), [type="text"], [type="search"]) {
+    @apply rounded-xs bg-field px-1.5 py-1 text-field-ink focus:bg-field-focus focus:outline-none;
+  }
+  input:where([type="range"], [type="checkbox"]) {
+    accent-color: var(--color-accent);
   }
 }
