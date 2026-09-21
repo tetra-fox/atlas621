@@ -18,10 +18,7 @@ use clap::{Args, Parser, Subcommand};
 use store::Store;
 
 #[derive(Parser)]
-#[command(
-    name = "atlas621-pipeline",
-    about = "turns the e621 db exports into the atlas621 map dataset"
-)]
+#[command(about = "turns the e621 db exports into the atlas621 map dataset")]
 struct Cli {
     #[arg(long, default_value_os_t = default_cache_dir())]
     cache_dir: PathBuf,

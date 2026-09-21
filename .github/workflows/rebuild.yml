@@ -37,7 +37,7 @@ jobs:
           else
             echo "no previous deploy reachable, cold start"
           fi
-          ./pipeline/target/release/atlas621-pipeline all $previous_arg
+          ./pipeline/target/release/atlas621 all $previous_arg
 
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
