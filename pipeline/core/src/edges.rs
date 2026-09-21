@@ -1,14 +1,14 @@
 use std::time::Instant;
 
-use clap::ValueEnum;
 use log::info;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::csr::Csr;
-use crate::posts::Pairs;
+use crate::pairs::Pairs;
 
-#[derive(Clone, Copy, Debug, ValueEnum, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
 pub enum Weight {
     Cosine,
     Npmi,
@@ -53,6 +53,10 @@ impl Edges {
         self.a.len()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.a.is_empty()
+    }
+
     pub fn push(&mut self, a: u32, b: u32, weight: f32, count: u32) {
         self.a.push(a);
         self.b.push(b);
@@ -95,6 +99,8 @@ fn weight(kind: Weight, posts: u64, count: u32, pa: u32, pb: u32) -> f32 {
     }
 }
 
+// a rare tag can never co-occur min_count times, so its pairs are judged against half its
+// own post count instead of being dropped outright
 fn threshold(min_count: u32, pa: u32, pb: u32) -> u32 {
     min_count.min(pa.min(pb).div_ceil(2)).max(1)
 }

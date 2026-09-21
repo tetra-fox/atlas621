@@ -89,24 +89,36 @@ dependencies = [
 ]
 
 [[package]]
-name = "atlas621-pipeline"
+name = "atlas-core"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
- "crossbeam-channel",
- "csv",
- "env_logger",
- "flate2",
  "geo",
- "hex",
- "jiff",
  "leiden-rs",
  "log",
  "nalgebra",
  "polylabel",
  "rand 0.10.2",
  "rayon",
+ "rustc-hash",
+ "serde",
+]
+
+[[package]]
+name = "atlas621-pipeline"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "atlas-core",
+ "clap",
+ "crossbeam-channel",
+ "csv",
+ "env_logger",
+ "flate2",
+ "hex",
+ "jiff",
+ "log",
  "regex",
  "rustc-hash",
  "serde",

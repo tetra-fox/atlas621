@@ -44,7 +44,7 @@ impl<T: Copy + Default> Csr<T> {
         Csr { off, col, val }
     }
 
-    pub fn len(&self) -> usize {
+    pub(crate) fn len(&self) -> usize {
         self.col.len()
     }
 

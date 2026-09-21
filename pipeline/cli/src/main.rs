@@ -1,24 +1,18 @@
-mod bin;
-mod communities;
-mod csr;
-mod edges;
-mod embed;
 mod emit;
 mod exports;
-mod layout;
 mod names;
 mod posts;
-mod quadtree;
+mod previous;
 mod search;
 mod store;
 mod tags;
 mod territories;
 mod text;
-mod tsne;
 
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
+use atlas_core::{communities, edges, embed, hex, layout, tsne};
 use clap::{Args, Parser, Subcommand};
 
 use store::Store;
@@ -415,7 +409,7 @@ fn layout(ctx: &Ctx, args: &LayoutArgs) -> Result<()> {
     let tags = ctx.store.load_tags()?;
     let region: Vec<u32> = ctx.store.load("communities.region")?;
     let initial = match &args.previous {
-        Some(source) => Some(layout::seed_positions(&tags, source)?),
+        Some(source) => Some(previous::seed_positions(&tags, source)?),
         None => None,
     };
     if let Mode::Tsne = args.mode {
@@ -460,17 +454,17 @@ fn territories(ctx: &Ctx, args: &TerritoryArgs) -> Result<()> {
     let pos: Vec<[f32; 2]> = ctx.store.load("layout.positions")?;
     let tags = ctx.store.load_tags()?;
     let ties = ctx.store.load_edges("edges")?;
-    let regions = territories::cut(
+    let regions = hex::cut(
         &pos,
-        &territories::CutParams {
+        &hex::CutParams {
             hex_cols: args.region_cols,
             rings: args.rings,
             min_nodes: args.region_min_nodes,
         },
     )?;
-    let continents = territories::cut(
+    let continents = hex::cut(
         &pos,
-        &territories::CutParams {
+        &hex::CutParams {
             hex_cols: args.continent_cols,
             rings: args.rings,
             min_nodes: args.continent_min_nodes,
@@ -489,7 +483,7 @@ fn territories(ctx: &Ctx, args: &TerritoryArgs) -> Result<()> {
     let meta = territories::Meta {
         regions: territories::name(&regions, &ties, post_counts, categories, &names),
         continents: territories::name(&continents, &ties, post_counts, categories, &names),
-        continent_of_region: territories::continent_of_region(&regions, &continents),
+        continent_of_region: hex::continent_of_region(&regions, &continents),
     };
     ctx.store.save("territories.region", &regions.membership)?;
     ctx.store.save("territories.continent", &continents.membership)?;

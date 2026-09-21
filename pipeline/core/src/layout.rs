@@ -1,67 +1,12 @@
 use std::time::Instant;
 
-use anyhow::{Context, Result};
 use log::{debug, info};
 use rand::prelude::*;
 use rayon::prelude::*;
-use rustc_hash::FxHashMap;
 
 use crate::csr::Csr;
 use crate::edges::Edges;
 use crate::quadtree::{NONE, QuadTree};
-use crate::tags::Tags;
-
-pub fn seed_positions(tags: &Tags, previous: &str) -> Result<Vec<[f32; 2]>> {
-    let fetch = |file: &str| -> Result<Vec<u8>> {
-        if previous.starts_with("http://") || previous.starts_with("https://") {
-            let url = format!("{}/{file}", previous.trim_end_matches('/'));
-            let mut resp = ureq::get(&url)
-                .call()
-                .map_err(|e| anyhow::anyhow!("fetch {url}: {e}"))?;
-            Ok(resp.body_mut().read_to_vec()?)
-        } else {
-            Ok(std::fs::read(std::path::Path::new(previous).join(file))?)
-        }
-    };
-    let gunzip = |bytes: Vec<u8>| -> Result<Vec<u8>> {
-        let mut out = Vec::new();
-        std::io::Read::read_to_end(&mut flate2::read::MultiGzDecoder::new(&bytes[..]), &mut out)?;
-        Ok(out)
-    };
-    let manifest: serde_json::Value = serde_json::from_slice(&fetch("manifest.json")?)?;
-    let n_old = manifest["nodes"]
-        .as_u64()
-        .context("previous manifest has no node count")? as usize;
-    let positions: Vec<[f32; 2]> =
-        crate::bin::read_all(&mut &gunzip(fetch("positions.bin.gz")?)?[..])?;
-    let names_blob = gunzip(fetch("names.bin.gz")?)?;
-    let offsets: Vec<u32> = crate::bin::read_all(&mut &names_blob[..(n_old + 1) * 4])?;
-    let text = std::str::from_utf8(&names_blob[(n_old + 1) * 4..])?;
-    let by_name: FxHashMap<&str, [f32; 2]> = (0..n_old)
-        .map(|i| {
-            (
-                &text[offsets[i] as usize..offsets[i + 1] as usize],
-                positions[i],
-            )
-        })
-        .collect();
-    let mut found = 0;
-    let seeded = tags.names[..tags.n_nodes]
-        .iter()
-        .map(|n| match by_name.get(n.as_str()) {
-            Some(p) => {
-                found += 1;
-                *p
-            }
-            None => [f32::NAN; 2],
-        })
-        .collect();
-    info!(
-        "warm start from {previous}: {found} of {} nodes have a previous position",
-        tags.n_nodes
-    );
-    Ok(seeded)
-}
 
 pub struct LayoutParams {
     pub iterations: usize,
@@ -299,6 +244,8 @@ impl Layout {
         });
     }
 
+    // the adaptive speed controller from the forceatlas2 paper; its constants are tuned as a
+    // set and are not meaningful on their own
     fn apply_forces(&mut self) -> (f32, f32) {
         let n = self.pos.len() as f32;
         let (swinging, traction) = self

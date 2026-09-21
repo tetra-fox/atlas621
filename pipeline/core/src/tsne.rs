@@ -9,6 +9,7 @@ use crate::csr::Csr;
 use crate::edges::Edges;
 use crate::embed::Embedding;
 use crate::quadtree::QuadTree;
+use crate::rng::normal;
 
 pub struct TsneParams {
     pub exaggeration: f64,
@@ -28,6 +29,16 @@ struct Optimizer {
 const MOMENTUM: f64 = 0.8;
 const MAX_STEP: f64 = 5.0;
 const MIN_GAIN: f64 = 0.01;
+// nudges tags off a shared starting point so the gradient can pull them apart
+const JITTER_SD: f64 = 2e-5;
+
+fn jitter(rng: &mut StdRng) -> f64 {
+    normal(rng, JITTER_SD)
+}
+// per-axis gain rises while the step still opposes the gradient, decays once they agree
+// and the point is overshooting
+const GAIN_RISE: f64 = 0.2;
+const GAIN_DECAY: f64 = 0.8;
 
 impl Optimizer {
     fn new(n: usize, learning_rate: f64) -> Optimizer {
@@ -47,9 +58,9 @@ impl Optimizer {
             .for_each(|(((p, u), g), d)| {
                 for c in 0..2 {
                     g[c] = if (u[c] < 0.0) != (d[c] < 0.0) {
-                        g[c] + 0.2
+                        g[c] + GAIN_RISE
                     } else {
-                        g[c] * 0.8 + MIN_GAIN
+                        g[c] * GAIN_DECAY + MIN_GAIN
                     };
                     u[c] = MOMENTUM * u[c] - lr * g[c] * d[c];
                 }
@@ -132,11 +143,14 @@ fn exact_tsne(dist: &[f64], k: usize, perplexity: f64) -> Vec<[f64; 2]> {
     let eig = m.symmetric_eigen();
     let mut order: Vec<usize> = (0..k).collect();
     order.sort_unstable_by(|&a, &b| eig.eigenvalues[b].total_cmp(&eig.eigenvalues[a]));
+    // the leading eigenvector of a normalized affinity matrix is constant, so start from the
+    // next two
     let mut pos: Vec<[f64; 2]> = (0..k)
         .map(|i| [eig.eigenvectors[(i, order[1])], eig.eigenvectors[(i, order[2])]])
         .collect();
     rescale(&mut pos, 1e-4);
     let mut grad = vec![[0.0; 2]; k];
+    // exaggerate first so clusters separate, then relax to settle their shape
     for (iterations, exaggeration) in [(250, 12.0), (500, 1.0)] {
         let mut opt = Optimizer::new(k, k as f64 / exaggeration);
         for _ in 0..iterations {
@@ -207,6 +221,7 @@ pub fn affinity_edges(emb: &Embedding, perplexity: f64, tail_neighbors: usize) -
     let t0 = Instant::now();
     let n = emb.core.len();
     let kn = emb.core_knn.len() / n;
+    // past three times the perplexity the gaussian affinities are near zero
     let k = ((3.0 * perplexity) as usize).min(kn);
     let rows: Vec<Vec<f64>> = (0..n)
         .into_par_iter()
@@ -558,11 +573,6 @@ pub fn layout(
         t0.elapsed()
     );
     all.iter().map(|p| [(p[0] * s) as f32, (p[1] * s) as f32]).collect()
-}
-
-fn jitter(rng: &mut StdRng) -> f64 {
-    let (u, v): (f64, f64) = (rng.random_range(f64::EPSILON..1.0), rng.random());
-    2e-5 * (-2.0 * u.ln()).sqrt() * (std::f64::consts::TAU * v).cos()
 }
 
 #[cfg(test)]

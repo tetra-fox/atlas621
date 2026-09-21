@@ -48,6 +48,7 @@ impl QuadTree {
                 hi[d] = hi[d].max(p[d]);
             }
         }
+        // padded so bodies sitting exactly on the bounding box still land inside the root cell
         let half = ((hi[0] - lo[0]).max(hi[1] - lo[1]) * 0.5 + 1e-3) * 1.001;
         let center = [(lo[0] + hi[0]) * 0.5, (lo[1] + hi[1]) * 0.5];
         let mut tree = QuadTree {

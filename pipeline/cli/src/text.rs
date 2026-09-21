@@ -35,6 +35,7 @@ pub struct Bur {
 #[derive(Serialize, Deserialize)]
 pub struct NodeImplication(pub u32, pub u32, pub Option<u16>, pub bool);
 
+// one field name per letter here and in NodeText: these shards are json the browser downloads
 #[derive(Serialize, Deserialize, Default)]
 pub struct Event {
     pub d: String,
@@ -359,6 +360,8 @@ pub fn build(
                 *per_day.entry(d.as_str()).or_insert(0) += 1;
             }
         }
+        // a day with this many implications is a migration that stamped its own date on old
+        // rows, so those dates are reported as approximate
         let lumps: FxHashSet<&str> = per_day
             .iter()
             .filter(|(_, c)| **c > params.lump_threshold)

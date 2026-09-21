@@ -11,15 +11,19 @@ use log::info;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 
-use crate::bin::{self, Le};
-use crate::edges::Edges;
-use crate::embed::Embedding;
+use atlas_core::bin::{self, Le};
+use atlas_core::edges::Edges;
+use atlas_core::embed::Embedding;
+use atlas_core::hex::{Feature, Level};
+
 use crate::posts::{PostStats, YEAR0};
 use crate::store::Store;
 use crate::tags::{self, Tags};
-use crate::territories::{Feature, Level, Meta, RegionInfo};
+use crate::territories::{Meta, RegionInfo};
 
+// cloudflare rejects static assets over 25 MiB, kept under with a margin
 const MAX_FILE: u64 = 24 * 1024 * 1024;
+// uncompressed bytes per part; gzip brings each well under MAX_FILE
 const PART_RAW: usize = 32 * 1024 * 1024;
 
 #[derive(Deserialize, Default)]
@@ -374,13 +378,7 @@ fn tiles(
             }
             let name = format!("tiles/{level}/{}_{}.bin.gz", i % per, i / per);
             fs::create_dir_all(e.out.join(format!("tiles/{level}")))?;
-            e.gz(&name, |w| {
-                bin::write_all(w, ranks)?;
-                bin::write_all(w, &ranks.iter().map(|&k| a[k as usize]).collect::<Vec<u32>>())?;
-                bin::write_all(w, &ranks.iter().map(|&k| b[k as usize]).collect::<Vec<u32>>())?;
-                bin::write_all(w, &ranks.iter().map(|&k| weight[k as usize]).collect::<Vec<u16>>())?;
-                Ok(())
-            })?;
+            e.gz(&name, |w| edge_run(w, ranks, a, b, weight))?;
         }
     }
     Ok(())
@@ -439,6 +437,19 @@ fn adjacency_shards(
 
 fn quantize(w: f32) -> u16 {
     (w.clamp(0.0, 1.0) * 65535.0).round() as u16
+}
+
+fn gather<T: Copy>(keys: &[u32], src: &[T]) -> Vec<T> {
+    keys.iter().map(|&k| src[k as usize]).collect()
+}
+
+// a run of edges picked out of the global edge list by rank; read by readEdgeRun on the web side
+fn edge_run<W: Write>(w: &mut W, keys: &[u32], a: &[u32], b: &[u32], weight: &[u16]) -> Result<()> {
+    bin::write_all(w, keys)?;
+    bin::write_all(w, &gather(keys, a))?;
+    bin::write_all(w, &gather(keys, b))?;
+    bin::write_all(w, &gather(keys, weight))?;
+    Ok(())
 }
 
 fn similar_lists(emb: &Embedding, take: usize, n: usize) -> Vec<Vec<(u32, u16)>> {
@@ -599,13 +610,7 @@ pub fn write(out_dir: &Path, store: &Store, inputs: EmitInputs) -> Result<()> {
     e.array("edges.weight.bin.gz", &weight)?;
     e.array("edges.count.bin.gz", &count)?;
     let base = base_scene(&a, &b, &tags.post_counts[..n], inputs.base_links);
-    e.gz("base.bin.gz", |w| {
-        bin::write_all(w, &base)?;
-        bin::write_all(w, &base.iter().map(|&k| a[k as usize]).collect::<Vec<u32>>())?;
-        bin::write_all(w, &base.iter().map(|&k| b[k as usize]).collect::<Vec<u32>>())?;
-        bin::write_all(w, &base.iter().map(|&k| weight[k as usize]).collect::<Vec<u16>>())?;
-        Ok(())
-    })?;
+    e.gz("base.bin.gz", |w| edge_run(w, &base, &a, &b, &weight))?;
     tiles(&mut e, &inputs.tile_cutoffs, &positions, &a, &b, &weight)?;
     adjacency_shards(&mut e, inputs.adj_shard_size, n, &a, &b, &weight)?;
     path_graph(&mut e, inputs.ties, &tags.post_counts[..n], inputs.playground_floor)?;

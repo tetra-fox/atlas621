@@ -5,10 +5,12 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
-use crate::bin::{self, Le};
-use crate::edges::Edges;
-use crate::embed::Embedding;
-use crate::posts::{Pairs, PostStats};
+use atlas_core::bin::{self, Le};
+use atlas_core::edges::Edges;
+use atlas_core::embed::Embedding;
+use atlas_core::pairs::Pairs;
+
+use crate::posts::PostStats;
 use crate::tags::{self, Tags};
 
 pub struct Store {

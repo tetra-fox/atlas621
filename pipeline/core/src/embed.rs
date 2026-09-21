@@ -7,7 +7,8 @@ use rayon::prelude::*;
 
 use crate::csr::Csr;
 use crate::edges::Edges;
-use crate::posts::Pairs;
+use crate::pairs::Pairs;
+use crate::rng::normal;
 
 pub struct EmbedParams {
     pub core_floor: u32,
@@ -30,12 +31,6 @@ pub struct Embedding {
     pub tail: Vec<u32>,
     pub tail_knn: Vec<u32>,
     pub tail_knn_sim: Vec<f32>,
-}
-
-fn normal(rng: &mut StdRng) -> f32 {
-    let u: f64 = rng.random_range(f64::EPSILON..1.0);
-    let v: f64 = rng.random();
-    ((-2.0 * u.ln()).sqrt() * (std::f64::consts::TAU * v).cos()) as f32
 }
 
 fn pmi(count: u32, posts: u64, pa: u32, pb: u32, shift: f64) -> f64 {
@@ -88,6 +83,8 @@ fn gram(x: &[f32], w: usize) -> DMatrix<f64> {
     g
 }
 
+// the gram matrix and its cholesky are f64 but the result rounds back to f32, which leaves the
+// columns slightly off orthogonal; one repeat is enough to fix it
 fn orthonormalize(x: &mut [f32], w: usize) {
     for _ in 0..2 {
         let g = gram(x, w);
@@ -115,10 +112,11 @@ fn randomized_svd(
     let t0 = Instant::now();
     let w = params.dim + params.oversample;
     let mut rng = StdRng::seed_from_u64(params.seed);
-    let omega: Vec<f32> = (0..n * w).map(|_| normal(&mut rng)).collect();
+    let omega: Vec<f32> = (0..n * w).map(|_| normal(&mut rng, 1.0) as f32).collect();
     let mut q = sparse_times(a, &omega, w);
     drop(omega);
     orthonormalize(&mut q, w);
+    // a is symmetric, so one power iteration of a*a' is two multiplies by a
     for _ in 0..params.power_iterations {
         for _ in 0..2 {
             q = sparse_times(a, &q, w);

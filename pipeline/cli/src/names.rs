@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use log::info;
 
-use crate::edges::Edges;
+use atlas_core::edges::Edges;
 
 pub struct NameParams {
     pub min_fit: f64,
@@ -11,6 +11,7 @@ pub struct NameParams {
     pub take: usize,
 }
 
+// e621's own tag category ids
 const GENERAL: u8 = 0;
 const COPYRIGHT: u8 = 3;
 const SPECIES: u8 = 5;
@@ -72,11 +73,11 @@ impl Fit {
         let mut best = vec![0f64; k];
         for c in 0..nc {
             for r in 0..k {
-                let p = into[c * k + r] / total[c].max(1e-9);
-                let rc = touch[c * k + r] as f64 / members[r].max(1) as f64;
-                let f = 2.0 * p * rc / (p + rc).max(1e-9);
-                fit[c * k + r] = f;
-                best[r] = best[r].max(f);
+                let precision = into[c * k + r] / total[c].max(1e-9);
+                let recall = touch[c * k + r] as f64 / members[r].max(1) as f64;
+                let f1 = 2.0 * precision * recall / (precision + recall).max(1e-9);
+                fit[c * k + r] = f1;
+                best[r] = best[r].max(f1);
             }
         }
         Fit {

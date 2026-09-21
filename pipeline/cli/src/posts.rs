@@ -7,6 +7,8 @@ use crossbeam_channel::{Receiver, bounded};
 use log::{info, warn};
 use rustc_hash::FxHashMap;
 
+use atlas_core::pairs::Pairs;
+
 use crate::exports;
 use crate::store::PairSink;
 use crate::tags::Tags;
@@ -15,6 +17,8 @@ pub const YEAR0: u16 = 2007;
 const MAX_YEARS: usize = 32;
 const BATCH_POSTS: usize = 8192;
 const INFLATE_CHUNK: usize = 4 << 20;
+// tags are sorted by post count, so the first DENSE of them produce most of the pairs; those
+// are counted in a flat matrix rather than the hash map
 const DENSE: usize = 8192;
 
 pub struct CountParams {
@@ -37,29 +41,6 @@ pub struct PostStats {
     pub distinct_node_pairs: u64,
     pub distinct_tail_pairs: u64,
     pub pair_increments: u64,
-}
-
-pub struct Pairs {
-    pub keys: Vec<u64>,
-    pub counts: Vec<u32>,
-}
-
-impl Pairs {
-    pub fn key(hi: u32, lo: u32) -> u64 {
-        ((hi as u64) << 32) | lo as u64
-    }
-    fn hi(key: u64) -> u32 {
-        (key >> 32) as u32
-    }
-    fn lo(key: u64) -> u32 {
-        key as u32
-    }
-    pub fn iter(&self) -> impl Iterator<Item = (u32, u32, u32)> + Clone + '_ {
-        self.keys
-            .iter()
-            .zip(&self.counts)
-            .map(|(&k, &c)| (Pairs::hi(k), Pairs::lo(k), c))
-    }
 }
 
 #[derive(Default)]

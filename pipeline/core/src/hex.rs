@@ -6,9 +6,6 @@ use log::info;
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 
-use crate::edges::Edges;
-use crate::names::{self, Fit, NameParams};
-
 pub struct CutParams {
     pub hex_cols: usize,
     pub rings: usize,
@@ -28,19 +25,6 @@ pub struct Feature {
 pub struct Level {
     pub hex_size: f64,
     pub features: Vec<Feature>,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct RegionInfo {
-    pub size: usize,
-    pub name_tags: Vec<u32>,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct Meta {
-    pub regions: Vec<RegionInfo>,
-    pub continents: Vec<RegionInfo>,
-    pub continent_of_region: Vec<u32>,
 }
 
 pub struct Cut {
@@ -67,6 +51,8 @@ impl Grid {
     fn cell(&self, x: f64, y: f64) -> (i32, i32) {
         let qf = (2.0 / 3.0 * x) / self.size;
         let rf = (SQRT3 / 3.0 * y - x / 3.0) / self.size;
+        // round in cube coordinates, where the three axes must sum to zero, then discard
+        // whichever one moved furthest and rebuild it from the other two
         let (xf, zf) = (qf, rf);
         let yf = -xf - zf;
         let (mut rx, mut rz) = (xf.round(), zf.round());
@@ -281,23 +267,6 @@ pub fn cut(pos: &[[f32; 2]], params: &CutParams) -> Result<Cut> {
         membership,
         sizes,
     })
-}
-
-pub fn name(
-    cut: &Cut,
-    ties: &Edges,
-    post_counts: &[u32],
-    categories: &[u8],
-    params: &NameParams,
-) -> Vec<RegionInfo> {
-    let k = cut.sizes.len();
-    let fit = Fit::compute(ties, &cut.membership, k, post_counts, categories, params);
-    let names = names::names(&fit, &cut.membership, post_counts, categories, params);
-    cut.sizes
-        .iter()
-        .zip(names)
-        .map(|(&size, name_tags)| RegionInfo { size, name_tags })
-        .collect()
 }
 
 pub fn continent_of_region(regions: &Cut, continents: &Cut) -> Vec<u32> {

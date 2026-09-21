@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::tags::Tags;
 
+// one field name per letter: these shards are json the browser downloads per search
 #[derive(Serialize, Deserialize)]
 pub struct Entry {
     pub n: String,
