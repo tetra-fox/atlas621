@@ -22,6 +22,7 @@ use store::Store;
 struct Cli {
     #[arg(long, default_value_os_t = default_cache_dir())]
     cache_dir: PathBuf,
+    /// where each stage leaves its output for the next one
     #[arg(long, default_value = "pipeline/work")]
     work_dir: PathBuf,
     #[arg(long)]
@@ -32,15 +33,25 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Cmd {
+    /// download the e621 db exports into the cache
     Fetch,
+    /// scan the posts export for tag pairs and per-year totals
     Count(CountArgs),
+    /// keep each tag's strongest pairings as the graph edges
     Edges(EdgesArgs),
+    /// factor the pair counts into vectors, then the knn and affinity graphs
     Embed(EmbedArgs),
+    /// group tags into regions with leiden
     Communities(CommunityArgs),
+    /// place every tag on the plane
     Layout(LayoutArgs),
+    /// cut the layout into hex regions and continents, then name them
     Territories(TerritoryArgs),
+    /// build the wiki, alias and history shards and the search index
     Text(TextArgs),
+    /// write the dataset the site loads
     Emit(EmitArgs),
+    /// run every stage in order, fetch through emit
     All(Box<AllArgs>),
 }
 
