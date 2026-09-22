@@ -31,13 +31,13 @@ jobs:
 
       - name: run pipeline
         run: |
-          previous_arg=""
+          previous=()
           if curl -fsSIL "$SITE_URL/data/manifest.json" > /dev/null; then
-            previous_arg="--previous $SITE_URL/data"
+            previous=(--previous "$SITE_URL/data")
           else
             echo "no previous deploy reachable, cold start"
           fi
-          ./pipeline/target/release/atlas621 all $previous_arg
+          ./pipeline/target/release/atlas621 all "${previous[@]}"
 
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
