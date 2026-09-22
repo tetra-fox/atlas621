@@ -88,7 +88,8 @@
         tileCutoffs: manifest.tile_cutoffs,
         tiles: Object.keys(manifest.files).filter((f) => f.startsWith("tiles/")),
         adjShardSize: manifest.adj_shard_size,
-        version: manifest.generated_at
+        version: manifest.generated_at,
+        weightMax: manifest.weight_max
       }
     };
     links.postMessage(init, [

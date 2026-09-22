@@ -50,6 +50,7 @@ struct Manifest {
     nodes: usize,
     edges: usize,
     space_size: u32,
+    weight_max: u32,
     max_degree: u32,
     base_links: usize,
     tail_neighbors: usize,
@@ -449,8 +450,12 @@ fn adjacency_shards(
     Ok(())
 }
 
+// link weights ship as a u16 fraction of this, which the manifest passes on so the reader does
+// not have to assume it
+const WEIGHT_MAX: u16 = u16::MAX;
+
 fn quantize(w: f32) -> u16 {
-    (w.clamp(0.0, 1.0) * 65535.0).round() as u16
+    (w.clamp(0.0, 1.0) * f32::from(WEIGHT_MAX)).round() as u16
 }
 
 fn gather<T: Copy>(keys: &[u32], src: &[T]) -> Vec<T> {
@@ -733,6 +738,7 @@ pub fn write(out_dir: &Path, store: &Store, inputs: EmitInputs) -> Result<()> {
         nodes: n,
         edges: m,
         space_size: SPACE_SIZE as u32,
+        weight_max: u32::from(WEIGHT_MAX),
         max_degree,
         base_links: base.len(),
         tail_neighbors: inputs.tail_neighbors,

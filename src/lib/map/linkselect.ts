@@ -23,6 +23,7 @@ export type LinkInput = {
   tiles: string[];
   adjShardSize: number;
   version: string;
+  weightMax: number;
 };
 
 export type LinkQuery = {

@@ -1,4 +1,5 @@
 import { setDataVersion } from "$lib/data/fetch";
+import { setWeightMax } from "$lib/data/manifest";
 import { loadAdjacencyShard, loadTile, type AdjacencyShard, type EdgeRun } from "$lib/data/tiles";
 
 import {
@@ -161,6 +162,7 @@ self.onmessage = (event: MessageEvent<LinksMessage>) => {
     inBase = baseMembership(msg.data.base, msg.data.edgeCount);
     tileFiles = new Set(msg.data.tiles);
     setDataVersion(msg.data.version);
+    setWeightMax(msg.data.weightMax);
     const first = "tiles/0/0_0.bin.gz";
     if (tileFiles.has(first)) tileAt(first).catch(failed);
     return;

@@ -10,7 +10,7 @@ export type Feature = { community: number, label: boolean, anchor: [number, numb
 
 export type LevelOut = { hex_size: number, origin: [number, number], features: Array<Feature>, };
 
-export type Manifest = { export_date: string, generated_at: string, node_floor: number, playground_floor: number, nodes: number, edges: number, space_size: number, max_degree: number, base_links: number, tail_neighbors: number, text_shards: Array<number>, tile_cutoffs: Array<number>, adj_shard_size: number, years: Array<number>, years_over: number, files: Record<string, number>, parts: { [key in string]: number }, };
+export type Manifest = { export_date: string, generated_at: string, node_floor: number, playground_floor: number, nodes: number, edges: number, space_size: number, weight_max: number, max_degree: number, base_links: number, tail_neighbors: number, text_shards: Array<number>, tile_cutoffs: Array<number>, adj_shard_size: number, years: Array<number>, years_over: number, files: Record<string, number>, parts: { [key in string]: number }, };
 
 export type NamedCommunity = { name: string, tags: Array<string>, size: number, };
 

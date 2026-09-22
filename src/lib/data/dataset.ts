@@ -13,6 +13,7 @@ import type {
   NodeText,
   TerritoriesOut
 } from "./generated";
+import { setWeightMax } from "./manifest";
 import type { Manifest } from "./manifest";
 import NamesWorker from "./names.worker?worker";
 import type { NamesRequest, NamesResponse } from "./names.worker";
@@ -54,6 +55,7 @@ export const loadManifest = async (): Promise<Manifest> => {
   const manifest = await fetchJson<Manifest>("manifest.json");
   endStep("fetching the file list");
   setDataVersion(manifest.generated_at);
+  setWeightMax(manifest.weight_max);
   return manifest;
 };
 
