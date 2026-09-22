@@ -14,5 +14,5 @@
     "stylesheet": "./src/app.css"
   },
   "sortPackageJson": false,
-  "ignorePatterns": ["pnpm-lock.yaml", "/static/"]
+  "ignorePatterns": ["pnpm-lock.yaml", "/static/", "/src/lib/data/generated.ts"]
 }

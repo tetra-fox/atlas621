@@ -32,3 +32,6 @@ jobs:
       - run: cargo fmt --all --check --manifest-path pipeline/Cargo.toml
       - run: cargo clippy --manifest-path pipeline/Cargo.toml --all-targets -- -D warnings
       - run: cargo test --release --manifest-path pipeline/Cargo.toml
+      # the rust types are the source of truth for the emitted json; the test run regenerates
+      # the typescript from them, so a diff here means someone changed one side only
+      - run: git diff --exit-code src/lib/data/generated.ts

@@ -1,3 +1,4 @@
+use ts_rs::TS;
 use std::cmp::Reverse;
 use std::collections::BTreeMap;
 use std::fs::{self, File};
@@ -9,7 +10,7 @@ use flate2::Compression;
 use flate2::write::GzEncoder;
 use tracing::{debug, info};
 use serde::{Deserialize, Serialize};
-use serde_json::{Map, Value, json};
+
 
 use atlas_core::bin::Le;
 use atlas_core::ipc::{self, Column};
@@ -21,6 +22,7 @@ use crate::posts::{PostStats, YEAR0};
 use crate::store::Store;
 use crate::tags::Tags;
 use crate::territories::{Meta, RegionInfo};
+use crate::text::NodeText;
 
 // cloudflare rejects static assets over 25 MiB, kept under with a margin
 const MAX_FILE: u64 = 24 * 1024 * 1024;
@@ -38,7 +40,8 @@ pub struct Overrides {
 const SPACE_SIZE: f64 = 4096.0;
 const SPACE_MARGIN: f64 = 0.02;
 
-#[derive(Serialize)]
+#[derive(Serialize, TS)]
+#[ts(export, export_to = "../../../src/lib/data/generated.ts")]
 struct Manifest {
     export_date: String,
     generated_at: String,
@@ -55,32 +58,38 @@ struct Manifest {
     adj_shard_size: usize,
     years: Vec<u16>,
     years_over: usize,
+    // serde writes these as json numbers, so the u64 must not surface as a bigint
+    #[ts(type = "Record<string, number>")]
     files: BTreeMap<String, u64>,
     parts: BTreeMap<String, usize>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, TS)]
+#[ts(export, export_to = "../../../src/lib/data/generated.ts")]
 struct NamedCommunity {
     name: String,
     tags: Vec<String>,
     size: usize,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, TS)]
+#[ts(export, export_to = "../../../src/lib/data/generated.ts")]
 struct CommunitiesOut {
     regions: Vec<NamedCommunity>,
     continents: Vec<NamedCommunity>,
     continent_of_region: Vec<u32>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, TS)]
+#[ts(export, export_to = "../../../src/lib/data/generated.ts")]
 struct LevelOut {
     hex_size: f64,
     origin: [f64; 2],
     features: Vec<Feature>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, TS)]
+#[ts(export, export_to = "../../../src/lib/data/generated.ts")]
 struct TerritoriesOut {
     regions: LevelOut,
     continents: LevelOut,
@@ -160,14 +169,14 @@ impl Emitter {
         n: usize,
         store_shard_size: usize,
         target: usize,
-        fields: impl Fn(usize, &mut Map<String, Value>),
+        fields: impl Fn(usize, &mut NodeText),
     ) -> Result<Vec<u32>> {
         let mut shards: Vec<Vec<u8>> = Vec::new();
         let mut starts: Vec<u32> = Vec::new();
         let mut current: Vec<u8> = Vec::new();
         for s in 0..n.div_ceil(store_shard_size) {
             let path = from.join(format!("{s:03}.json"));
-            let mut shard: BTreeMap<u32, Map<String, Value>> = match File::open(&path) {
+            let mut shard: BTreeMap<u32, NodeText> = match File::open(&path) {
                 Ok(f) => serde_json::from_reader(BufReader::new(f))
                     .with_context(|| format!("parse {}", path.display()))?,
                 Err(e) if e.kind() == std::io::ErrorKind::NotFound => BTreeMap::new(),
@@ -699,22 +708,17 @@ pub fn write(out_dir: &Path, store: &Store, inputs: EmitInputs) -> Result<()> {
         inputs.store_shard_size,
         inputs.text_shard_bytes,
         |i, entry| {
-            entry.insert("ratings".into(), json!(&inputs.stats.node_rating[i * 3..i * 3 + 3]));
-            entry.insert("region".into(), json!(inputs.region[i]));
-            if !appears[i].is_empty() {
-                let flat: Vec<u32> = appears[i]
-                    .iter()
-                    .flat_map(|&(other, w, c)| [other, u32::from(w), c])
-                    .collect();
-                entry.insert("edges".into(), json!(flat));
-            }
-            if !similar[i].is_empty() {
-                let flat: Vec<u32> = similar[i]
-                    .iter()
-                    .flat_map(|&(other, w)| [other, u32::from(w)])
-                    .collect();
-                entry.insert("similar".into(), json!(flat));
-            }
+            let r = &inputs.stats.node_rating[i * 3..i * 3 + 3];
+            entry.ratings = [r[0], r[1], r[2]];
+            entry.region = inputs.region[i];
+            entry.edges = appears[i]
+                .iter()
+                .flat_map(|&(other, w, c)| [other, u32::from(w), c])
+                .collect();
+            entry.similar = similar[i]
+                .iter()
+                .flat_map(|&(other, w)| [other, u32::from(w)])
+                .collect();
         },
     )?;
     e.copy_dir(&store.path("search"), "search")?;

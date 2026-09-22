@@ -1,3 +1,4 @@
+use ts_rs::TS;
 use std::collections::BTreeMap;
 use std::io::Read;
 use std::time::Instant;
@@ -24,7 +25,8 @@ pub struct TextMeta {
     pub shard_size: usize,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../../src/lib/data/generated.ts")]
 pub struct Bur {
     pub id: u32,
     pub date: String,
@@ -32,10 +34,12 @@ pub struct Bur {
     pub ops: Vec<[String; 3]>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../../src/lib/data/generated.ts")]
 pub struct NodeImplication(pub u32, pub u32, pub Option<u16>, pub bool);
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize, Default, TS)]
+#[ts(export, export_to = "../../../src/lib/data/generated.ts")]
 pub struct Event {
     pub date: String,
     pub kind: String,
@@ -47,7 +51,8 @@ pub struct Event {
     pub approx: bool,
 }
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize, Default, TS)]
+#[ts(export, export_to = "../../../src/lib/data/generated.ts")]
 pub struct NodeText {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub wiki: Option<String>,
@@ -61,6 +66,17 @@ pub struct NodeText {
     pub parents: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub history: Vec<Event>,
+    // the emit stage fills the rest in from the dataset rather than the text exports
+    #[serde(default)]
+    pub ratings: [u32; 3],
+    #[serde(default)]
+    pub region: u32,
+    // flat triples of node, quantised weight, shared post count
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub edges: Vec<u32>,
+    // flat pairs of node, quantised similarity
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub similar: Vec<u32>,
 }
 
 pub struct TextOutput {

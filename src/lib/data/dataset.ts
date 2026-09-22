@@ -2,57 +2,34 @@ import { Names } from "$lib/core/strings";
 import { readTable, runs, strings, values } from "$lib/core/table";
 
 import { fetchColumn, fetchGz, fetchJson, setDataVersion } from "./fetch";
+import type {
+  Bur,
+  CommunitiesOut,
+  Event,
+  Feature,
+  LevelOut,
+  NamedCommunity,
+  NodeImplication,
+  NodeText,
+  TerritoriesOut
+} from "./generated";
 import type { Manifest } from "./manifest";
 import NamesWorker from "./names.worker?worker";
 import type { NamesRequest, NamesResponse } from "./names.worker";
 import { beginStep, endStep } from "./progress";
 import { readEdgeRun, type EdgeRun } from "./tiles";
 
-export type Territory = {
-  community: number;
-  label: boolean;
-  anchor: [number, number];
-  cells: number;
-  hexes: number[];
-};
+// the shapes the pipeline emits, generated from its rust types by ts-rs
+export type Territory = Feature;
+export type TerritoryLevel = LevelOut;
+export type Territories = TerritoriesOut;
+export type Community = NamedCommunity;
+export type Implication = NodeImplication;
+export type HistoryEvent = Event;
+export type ChangelogEntry = Bur;
+export type { NodeText };
 
-export type TerritoryLevel = { hex_size: number; origin: [number, number]; features: Territory[] };
-export type Territories = { regions: TerritoryLevel; continents: TerritoryLevel };
-
-export type Community = { name: string; tags: string[]; size: number };
-
-export type Communities = {
-  regions: Community[];
-  continents: Community[];
-  continent_of_region: number[];
-};
-
-export type Implication = [child: number, parent: number, day: number | null, approx: boolean];
-
-export type HistoryEvent = {
-  date: string;
-  kind: string;
-  // the tag on the other side of the alias or implication
-  other: string;
-  source: string;
-  // the date came from a migration day rather than the change itself
-  approx?: boolean;
-};
-
-export type NodeText = {
-  wiki?: string;
-  links?: number[];
-  aliases?: string[];
-  children?: string[];
-  parents?: string[];
-  history?: HistoryEvent[];
-  ratings?: [number, number, number];
-  region?: number;
-  // flat triples of node, weight, count
-  edges?: number[];
-  // flat pairs of node, weight
-  similar?: number[];
-};
+export type Communities = CommunitiesOut;
 
 export type SearchEntry = {
   name: string;
@@ -63,13 +40,6 @@ export type SearchEntry = {
   tail: number[];
   // set only on an alias row, naming the tag it redirects to
   alias?: string;
-};
-
-export type ChangelogEntry = {
-  id: number;
-  date: string;
-  title: string;
-  ops: [string, string, string][];
 };
 
 export type Core = {

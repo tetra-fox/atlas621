@@ -1,3 +1,4 @@
+use ts_rs::TS;
 use std::time::Instant;
 
 use anyhow::Result;
@@ -12,7 +13,8 @@ pub struct CutParams {
     pub min_nodes: usize,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../../src/lib/data/generated.ts")]
 pub struct Feature {
     pub community: u32,
     pub label: bool,
