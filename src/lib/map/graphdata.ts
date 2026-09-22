@@ -1,9 +1,10 @@
 import type { Years } from "$lib/data/dataset";
+import { CATEGORY_COLORS, radiusFor, yearColor } from "$lib/render/palette";
 
-import { CATEGORY_COLORS, radiusFor, yearColor } from "./palette";
+import type { ColorMode } from "./state.svelte";
 
 export type Look = {
-  colorMode: "category" | "birth";
+  colorMode: ColorMode;
   yearExtent: [number, number];
 };
 
@@ -40,6 +41,10 @@ export const pointColors = (
   return out;
 };
 
+// a per-year count too big for u16 is stored as ROW_SENTINEL, with the true value
+// in years.over as (cell, value) pairs
+const ROW_SENTINEL = 65535;
+
 export const countsWithin = (
   postCounts: Uint32Array,
   years: Years | null,
@@ -62,7 +67,7 @@ export const countsWithin = (
   }
   for (let k = 0; k < over.length; k += 2) {
     const y = over[k] % span;
-    if (y >= from && y <= to) out[Math.floor(over[k] / span)] += over[k + 1] - 65535;
+    if (y >= from && y <= to) out[Math.floor(over[k] / span)] += over[k + 1] - ROW_SENTINEL;
   }
   return out;
 };

@@ -1,4 +1,7 @@
-import { Cursor, fetchGz, type Manifest } from "./format";
+import { Cursor } from "$lib/core/binary";
+
+import { fetchGz } from "./fetch";
+import type { Manifest } from "./manifest";
 
 export type Vectors = { dim: number; nodes: Uint32Array; data: Int8Array; row: Int32Array };
 

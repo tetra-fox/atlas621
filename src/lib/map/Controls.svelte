@@ -1,11 +1,11 @@
 <script lang="ts">
+  import { CATEGORY_NAMES, categoryCss, categoryHoverCss } from "$lib/render/palette";
   import Pause from "@lucide/svelte/icons/pause";
   import Play from "@lucide/svelte/icons/play";
   import { RadioGroup, Slider, Switch, Toggle } from "bits-ui";
   import type { Attachment } from "svelte/attachments";
 
   import { MAX_DENSITY } from "./linkselect";
-  import { CATEGORY_NAMES, categoryCss, categoryHoverCss } from "./palette";
   import { getMapState } from "./state.svelte";
 
   type Props = { years: number[] };
@@ -169,7 +169,7 @@
             "pointer-events-none mb-0.5 text-[10px] leading-none whitespace-nowrap text-ink/70 tabular-nums",
             close &&
               values[0] !== values[1] &&
-              (index === 0 ? "!-translate-x-full" : "!translate-x-0")
+              (index === 0 ? "-translate-x-full!" : "translate-x-0!")
           ]}>
           {values[index]}
         </Slider.ThumbLabel>

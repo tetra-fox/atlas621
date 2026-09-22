@@ -1,21 +1,12 @@
-import type { LabelZooms } from "$lib/map/labels";
-import LabelsWorker from "$lib/map/labels.worker?worker";
-import type { LabelsRequest, LabelsResponse } from "$lib/map/labels.worker";
+import { Cursor } from "$lib/core/binary";
+import { Names } from "$lib/core/strings";
 
-import {
-  beginStep,
-  Cursor,
-  dataUrl,
-  endStep,
-  fetchArray,
-  fetchGz,
-  fetchJson,
-  setDataVersion,
-  type Manifest
-} from "./format";
-import { Names } from "./names";
+import { dataUrl, fetchArray, fetchGz, fetchJson, setDataVersion } from "./fetch";
+import type { Manifest } from "./manifest";
 import NamesWorker from "./names.worker?worker";
 import type { NamesRequest, NamesResponse } from "./names.worker";
+import { beginStep, endStep } from "./progress";
+import { readEdgeRun, type EdgeRun } from "./tiles";
 
 export type Territory = {
   community: number;
@@ -69,13 +60,6 @@ export type Core = {
   categories: Uint8Array;
 };
 
-export type Base = {
-  index: Uint32Array;
-  a: Uint32Array;
-  b: Uint32Array;
-  weight: Uint16Array;
-};
-
 export const loadManifest = async (): Promise<Manifest> => {
   beginStep("fetching the file list");
   const manifest = await fetchJson<Manifest>("manifest.json");
@@ -111,10 +95,9 @@ export const loadCore = async (manifest: Manifest): Promise<Core> => {
   return { manifest, positions, postCounts, categories };
 };
 
-export const loadBase = async (manifest: Manifest): Promise<Base> => {
-  const k = manifest.base_links;
+export const loadBase = async (manifest: Manifest): Promise<EdgeRun> => {
   const c = new Cursor(await fetchGz("base.bin.gz", manifest.files["base.bin.gz"], "first edges"));
-  return { index: c.u32(k), a: c.u32(k), b: c.u32(k), weight: c.u16(k) };
+  return readEdgeRun(c, manifest.base_links);
 };
 
 export const loadNames = async (manifest: Manifest): Promise<Names> => {
@@ -127,44 +110,6 @@ export const loadNames = async (manifest: Manifest): Promise<Names> => {
   const c = new Cursor(back.buffer);
   return new Names(c.u32(count + 1), c.u8(c.remaining), back.table);
 };
-
-export const loadLabelZooms = (
-  core: Core,
-  names: Names,
-  font: string,
-  zoomMax: number,
-  onSnapshot: (zooms: LabelZooms) => void
-): Promise<LabelZooms> =>
-  new Promise((resolve, reject) => {
-    const worker = new LabelsWorker();
-    const request: LabelsRequest = {
-      positions: core.positions.slice(),
-      postCounts: core.postCounts.slice(),
-      offsets: names.offsets.slice(),
-      bytes: names.bytes.slice(),
-      font,
-      space: core.manifest.space_size,
-      zoomMax
-    };
-    worker.onmessage = (event: MessageEvent<LabelsResponse>) => {
-      const { done, ...zooms } = event.data;
-      onSnapshot(zooms);
-      if (done === zooms.zoom.length) {
-        worker.terminate();
-        resolve(zooms);
-      }
-    };
-    worker.onerror = (event) => {
-      worker.terminate();
-      reject(new Error(event.message));
-    };
-    worker.postMessage(request, [
-      request.positions.buffer,
-      request.postCounts.buffer,
-      request.offsets.buffer,
-      request.bytes.buffer
-    ]);
-  });
 
 export const loadU16 = async (
   manifest: Manifest,
@@ -225,6 +170,7 @@ export const loadNodeText = async (
   return (await p)[String(node)];
 };
 
+// must agree with shard_key in the pipeline's search.rs, which named the shard files
 export const shardKey = (query: string): string => {
   let key = "";
   for (const ch of (query + "__").slice(0, 2)) key += /[a-z0-9]/.test(ch) ? ch : "_";

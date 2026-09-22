@@ -1,16 +1,3 @@
-import { radiusFor } from "./palette";
-
-export const LABEL_PAD = 4;
-export const LABEL_GAP_X = 24;
-export const LABEL_GAP_Y = 16;
-export const LABEL_LEFT = 3;
-export const LABEL_SIZES = [10, 11, 12, 13, 14, 15] as const;
-
-export const labelFontSize = (count: number): number =>
-  Math.round(Math.min(15, 10 + Math.log10(Math.max(1, count))));
-export const labelBoxHeight = (size: number): number => Math.ceil(size * 1.4) + LABEL_PAD * 2;
-export const LABEL_HALF_MAX = labelBoxHeight(15) / 2;
-
 const LEVEL_MIN = -7;
 const LEVEL_MAX = 6;
 const BUCKETS_PER_LEVEL = 32;
@@ -33,8 +20,17 @@ export type LabelZooms = {
 const CELL_X = 160;
 const CELL_Y = 80;
 const CELL_MAX = 32;
-const ENTRY = 6;
 const SNAPSHOT_FIRST = 25_000;
+
+// placed labels live in one flat array, ENTRY floats each, chained per grid cell
+// through ENTRY_NEXT with heads[cell] holding the first index
+const ENTRY_X = 0;
+const ENTRY_Y = 1;
+const ENTRY_REACH = 2;
+const ENTRY_HALF_H = 3;
+const ENTRY_ZOOM = 4;
+const ENTRY_NEXT = 5;
+const ENTRY = 6;
 
 const bucketed = (zoom: Float32Array, reach: number): LabelZooms => {
   const n = zoom.length;
@@ -47,22 +43,23 @@ const bucketed = (zoom: Float32Array, reach: number): LabelZooms => {
   return { zoom, order, starts, reach };
 };
 
+// finds the zoom at which each label first clears every label placed before it; labels arrive in
+// descending priority, so the earlier one always wins and one forward pass settles them all
 export const labelZooms = (
   positions: Float32Array,
-  postCounts: Uint32Array,
-  widths: Float32Array,
+  reach: Float32Array,
+  halfH: Float32Array,
+  gapY: number,
   space: number,
   zoomMax: number,
   onSnapshot: (zooms: LabelZooms, done: number) => void
 ): LabelZooms => {
-  const n = postCounts.length;
-  const reach = new Float32Array(n);
-  const halfH = new Float32Array(n);
+  const n = reach.length;
   let reachMax = 0;
+  let halfMax = 0;
   for (let i = 0; i < n; i++) {
-    reach[i] = 2 * radiusFor(postCounts[i]) + widths[i] + LABEL_GAP_X;
-    halfH[i] = labelBoxHeight(labelFontSize(postCounts[i])) / 2;
     if (reach[i] > reachMax) reachMax = reach[i];
+    if (halfH[i] > halfMax) halfMax = halfH[i];
   }
 
   const levels = LEVEL_MAX + 1 - LEVEL_MIN;
@@ -102,8 +99,11 @@ export const labelZooms = (
     let t = 0;
     for (let l = levels - 1; l >= 0 && t <= zoomMax; l--) {
       if (members[l] === 0) continue;
+      // a conflict has to beat both zooms to matter, so search from the larger of the two
       const tq = Math.max(t, levelZoom[l]);
-      const ry = (hi + LABEL_HALF_MAX + LABEL_GAP_Y) / tq;
+      // a label only extends right, so the columns are its own span; placed labels occupy one
+      // row each, so the rows are widened by the tallest box instead
+      const ry = (hi + halfMax + gapY) / tq;
       const row0 = Math.max(0, Math.floor((yi - ry) * invY[l]));
       const row1 = Math.min(rows[l] - 1, Math.floor((yi + ry) * invY[l]));
       const col0 = Math.min(cols[l] - 1, Math.max(0, Math.floor(xi * invX[l])));
@@ -113,13 +113,13 @@ export const labelZooms = (
         for (let col = col0; col <= col1; col++)
           for (let e = heads[rowBase + col]; e >= 0;) {
             const o = e * ENTRY;
-            const dx = xi - entry[o];
-            const dy = yi - entry[o + 1];
-            const ty = dy === 0 ? Infinity : (hi + entry[o + 3] + LABEL_GAP_Y) / Math.abs(dy);
-            const tx = dx > 0 ? entry[o + 2] / dx : dx < 0 ? ri / -dx : Infinity;
+            const dx = xi - entry[o + ENTRY_X];
+            const dy = yi - entry[o + ENTRY_Y];
+            const ty = dy === 0 ? Infinity : (hi + entry[o + ENTRY_HALF_H] + gapY) / Math.abs(dy);
+            const tx = dx > 0 ? entry[o + ENTRY_REACH] / dx : dx < 0 ? ri / -dx : Infinity;
             const tij = Math.min(tx, ty);
-            if (tij > t && tij > entry[o + 4]) t = tij;
-            e = entry[o + 5];
+            if (tij > t && tij > entry[o + ENTRY_ZOOM]) t = tij;
+            e = entry[o + ENTRY_NEXT];
           }
       }
     }
@@ -143,12 +143,12 @@ export const labelZooms = (
       }
       const cell = base[l] + row * cols[l] + col;
       const o = entries * ENTRY;
-      entry[o] = xi;
-      entry[o + 1] = yi;
-      entry[o + 2] = ri;
-      entry[o + 3] = hi;
-      entry[o + 4] = t;
-      entry[o + 5] = heads[cell];
+      entry[o + ENTRY_X] = xi;
+      entry[o + ENTRY_Y] = yi;
+      entry[o + ENTRY_REACH] = ri;
+      entry[o + ENTRY_HALF_H] = hi;
+      entry[o + ENTRY_ZOOM] = t;
+      entry[o + ENTRY_NEXT] = heads[cell];
       heads[cell] = entries++;
     }
   }

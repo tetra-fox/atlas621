@@ -1,5 +1,6 @@
-import type { Base, Implication } from "$lib/data/dataset";
-import type { AdjacencyShard, Tile } from "$lib/data/tiles";
+import type { Implication } from "$lib/data/dataset";
+import { WEIGHT_MAX } from "$lib/data/manifest";
+import type { AdjacencyShard, EdgeRun } from "$lib/data/tiles";
 
 export type SpaceView = { minX: number; minY: number; maxX: number; maxY: number };
 
@@ -13,7 +14,7 @@ export const baseShownFor = (density: number, count: number): number =>
 export type LinkInput = {
   positions: Float32Array;
   postCounts: Uint32Array;
-  base: Base;
+  base: EdgeRun;
   implications: Implication[];
   edgeCount: number;
   maxDegree: number;
@@ -45,9 +46,10 @@ export const linkColorAt = (out: Float32Array, l: number, weight: number): void 
   out[l * 4] = 0.85;
   out[l * 4 + 1] = 0.9;
   out[l * 4 + 2] = 1;
-  out[l * 4 + 3] = 0.25 + 0.75 * Math.sqrt(weight / 65535);
+  out[l * 4 + 3] = 0.25 + 0.75 * Math.sqrt(weight / WEIGHT_MAX);
 };
 
+// unused link slots point a node at itself, and a zero-length line draws nothing
 export const parkRun = (links: Float32Array, start: number, slots: number): void => {
   for (let k = 0; k < slots; k++) {
     links[(start + k) * 2] = k;
@@ -55,7 +57,7 @@ export const parkRun = (links: Float32Array, start: number, slots: number): void
   }
 };
 
-export const baseMembership = (base: Base, edgeCount: number): Uint8Array => {
+export const baseMembership = (base: EdgeRun, edgeCount: number): Uint8Array => {
   const inBase = new Uint8Array(edgeCount);
   for (const e of base.index) inBase[e] = 1;
   return inBase;
@@ -124,7 +126,7 @@ export type LinkBase = {
   shown: number;
 };
 
-export const selectBase = (base: Base, shown: number, previousShown: number): LinkBase => {
+export const selectBase = (base: EdgeRun, shown: number, previousShown: number): LinkBase => {
   const start = Math.min(shown, previousShown);
   const end = Math.max(shown, previousShown);
   const links = new Float32Array((end - start) * 2);
@@ -177,7 +179,7 @@ export class DetailWalk {
     this.stopped = q.slots === 0;
   }
 
-  level(tiles: Tile[]): void {
+  level(tiles: EdgeRun[]): void {
     const { view } = this.q;
     if (!view || this.stopped) return;
     const { minX, minY, maxX, maxY } = view;

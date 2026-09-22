@@ -1,7 +1,7 @@
-import type { Names } from "$lib/data/names";
+import { glRenderer, watchFrames } from "$lib/core/frames";
+import type { Names } from "$lib/core/strings";
 import type { Graph } from "@cosmos.gl/graph";
 
-import { glRenderer, watchFrames } from "./debug";
 import type { MapState } from "./state.svelte";
 
 export type Mark = { kind: string; ms: number; at: number; detail: Record<string, number> };
@@ -280,7 +280,8 @@ const table = (rows: StepReport[]): string => {
     ["blocked", (r) => String(r.longTaskMs)],
     ["links", (r) => String(r.marks["links.upload"]?.slowest.links ?? "")],
     ["worker", (r) => (r.marks["worker.detail"]?.maxMs ?? 0).toFixed(1)],
-    ["overlay", (r) => (r.marks.overlay?.maxMs ?? 0).toFixed(1)]
+    ["labels", (r) => (r.marks["overlay.labels"]?.maxMs ?? 0).toFixed(1)],
+    ["terr", (r) => (r.marks["overlay.territory"]?.maxMs ?? 0).toFixed(1)]
   ];
   const widths = cols.map(([head, get]) =>
     Math.max(head.length, ...rows.map((r) => get(r).length))

@@ -1,3 +1,4 @@
+// indices are e621's own tag category ids
 export const CATEGORY_NAMES = [
   "general",
   "artist",
@@ -10,6 +11,7 @@ export const CATEGORY_NAMES = [
   "lore"
 ] as const;
 export const CATEGORY_COUNT = CATEGORY_NAMES.length;
+export const CATEGORY_GENERAL = 0;
 
 export const CATEGORY_COLORS: [number, number, number][] = [
   [180, 199, 217],
@@ -39,16 +41,6 @@ const css = ([r, g, b]: [number, number, number]): string => `rgb(${r} ${g} ${b}
 export const categoryCss = (k: number): string => css(CATEGORY_COLORS[k] ?? CATEGORY_COLORS[0]);
 export const categoryHoverCss = (k: number): string =>
   css(CATEGORY_HOVER_COLORS[k] ?? CATEGORY_HOVER_COLORS[0]);
-
-const tokens = new Map<string, string>();
-export const cssToken = (name: string): string => {
-  let value = tokens.get(name);
-  if (value === undefined) {
-    value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-    tokens.set(name, value);
-  }
-  return value;
-};
 
 export const radiusFor = (count: number): number =>
   Math.min(40, Math.max(1.5, 0.7 * Math.pow(count, 0.28)));

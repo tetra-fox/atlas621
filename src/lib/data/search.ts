@@ -1,7 +1,7 @@
+import type { Names } from "$lib/core/strings";
 import uFuzzy from "@leeoniya/ufuzzy";
 
-import { loadSearchShard, shardKey, type SearchEntry } from "./data/dataset";
-import type { Names } from "./data/names";
+import { loadSearchShard, shardKey, type SearchEntry } from "./dataset";
 
 const fuzzy = new uFuzzy({ intraMode: 1, intraIns: 1, intraSub: 1, intraTrn: 1, intraDel: 1 });
 

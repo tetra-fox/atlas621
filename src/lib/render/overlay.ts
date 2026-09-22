@@ -1,17 +1,13 @@
+import { atlasFor, measure, sprite } from "$lib/core/atlas";
+import { cssToken } from "$lib/core/css";
+import { zoomBucket, type LabelZooms } from "$lib/core/declutter";
+import { eachHexCell, hexCenter, hexHalfHeight } from "$lib/core/hex";
+import type { Names } from "$lib/core/strings";
 import type { Communities, Territory, TerritoryLevel as TerritoryData } from "$lib/data/dataset";
-import type { Names } from "$lib/data/names";
 import type { Graph } from "@cosmos.gl/graph";
 
-import {
-  LABEL_HALF_MAX,
-  LABEL_LEFT,
-  LABEL_PAD,
-  labelFontSize,
-  zoomBucket,
-  type LabelZooms
-} from "./labels";
-import { CATEGORY_COLORS, communityColor, cssToken, sizeScaleFor } from "./palette";
-import { hexCenter } from "./territories.gl";
+import { LABEL_HALF_MAX, LABEL_LEFT, LABEL_PAD, labelFontSize } from "./labels";
+import { CATEGORY_COLORS, communityColor, sizeScaleFor } from "./palette";
 
 export type TerritoryLevel = {
   features: (Territory & {
@@ -20,11 +16,10 @@ export type TerritoryLevel = {
   names: string[];
 };
 
-const SQRT3 = Math.sqrt(3);
-
 export const prepareTerritories = (level: TerritoryData, names: string[]): TerritoryLevel => {
+  const grid = { size: level.hex_size, origin: level.origin };
   const radius = level.hex_size;
-  const half = (radius * SQRT3) / 2;
+  const half = hexHalfHeight(grid);
   return {
     names,
     features: level.features.map((f) => {
@@ -32,15 +27,13 @@ export const prepareTerritories = (level: TerritoryData, names: string[]): Terri
       let minY = Infinity;
       let maxX = -Infinity;
       let maxY = -Infinity;
-      for (let i = 0; i < f.hexes.length; i += 2) {
-        const q = f.hexes[i];
-        const r = f.hexes[i + 1];
-        const [cx, cy] = hexCenter(level, q, r);
+      eachHexCell(f.hexes, (q, r) => {
+        const [cx, cy] = hexCenter(grid, q, r);
         if (cx - radius < minX) minX = cx - radius;
         if (cx + radius > maxX) maxX = cx + radius;
         if (cy - half < minY) minY = cy - half;
         if (cy + half > maxY) maxY = cy + half;
-      }
+      });
       return { ...f, bbox: [minX, minY, maxX, maxY] };
     })
   };
@@ -93,90 +86,16 @@ export const cameraAffine = (graph: Graph) => {
   return { sx: x1 - tx, sy: y1 - ty, tx, ty };
 };
 
-type Sprite = { x: number; y: number; w: number; h: number };
-type Draw = { sp: Sprite; x: number; y: number; w: number; h: number };
-type Atlas = {
-  canvas: HTMLCanvasElement;
-  ctx: CanvasRenderingContext2D;
-  dpr: number;
-  sprites: Map<string, Sprite>;
-  shelfY: number;
-  shelfH: number;
-  cursorX: number;
-};
-type Box = { width: number; height: number };
-const ATLAS_SIZE = 2048;
-const atlases = new Map<number, Atlas>();
-const boxCache = new Map<string, Box>();
-let probe: CanvasRenderingContext2D | null = null;
-
-const measure = (key: string, text: string, font: string): Box => {
-  let box = boxCache.get(key);
-  if (box) return box;
-  if (boxCache.size > 20000) boxCache.clear();
-  probe ??= document.createElement("canvas").getContext("2d");
-  if (!probe) throw new Error("overlay: no 2d context");
-  probe.font = font;
-  const size = Number.parseInt(font.match(/(\d+)px/)?.[1] ?? "12", 10);
-  box = {
-    width: Math.ceil(probe.measureText(text).width) + LABEL_PAD * 2,
-    height: Math.ceil(size * 1.4) + LABEL_PAD * 2
-  };
-  boxCache.set(key, box);
-  return box;
-};
-
-const atlasFor = (dpr: number): Atlas => {
-  let atlas = atlases.get(dpr);
-  if (atlas) return atlas;
-  const canvas = document.createElement("canvas");
-  canvas.width = ATLAS_SIZE;
-  canvas.height = ATLAS_SIZE;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("overlay: no 2d context");
-  atlas = { canvas, ctx, dpr, sprites: new Map(), shelfY: 0, shelfH: 0, cursorX: 0 };
-  atlases.set(dpr, atlas);
-  return atlas;
-};
-
-const sprite = (atlas: Atlas, key: string, text: string, font: string, fill: string): Sprite => {
-  let sp = atlas.sprites.get(key);
-  if (sp) return sp;
-  const { width, height } = measure(key, text, font);
-  const w = Math.ceil(width * atlas.dpr);
-  const h = Math.ceil(height * atlas.dpr);
-  if (atlas.cursorX + w > ATLAS_SIZE) {
-    atlas.shelfY += atlas.shelfH;
-    atlas.shelfH = 0;
-    atlas.cursorX = 0;
-  }
-  if (atlas.shelfY + Math.max(h, atlas.shelfH) > ATLAS_SIZE) {
-    atlas.ctx.clearRect(0, 0, ATLAS_SIZE, ATLAS_SIZE);
-    atlas.sprites.clear();
-    atlas.shelfY = 0;
-    atlas.shelfH = 0;
-    atlas.cursorX = 0;
-  }
-  sp = { x: atlas.cursorX, y: atlas.shelfY, w, h };
-  atlas.cursorX += w;
-  if (h > atlas.shelfH) atlas.shelfH = h;
-  const ctx = atlas.ctx;
-  ctx.save();
-  ctx.translate(sp.x, sp.y);
-  ctx.scale(atlas.dpr, atlas.dpr);
-  ctx.font = font;
-  ctx.textBaseline = "middle";
-  ctx.lineJoin = "round";
-  ctx.lineWidth = 3;
-  ctx.strokeStyle = cssToken("--color-page-dim");
-  ctx.globalAlpha = 0.9;
-  ctx.strokeText(text, LABEL_PAD, height / 2);
-  ctx.globalAlpha = 1;
-  ctx.fillStyle = fill;
-  ctx.fillText(text, LABEL_PAD, height / 2);
-  ctx.restore();
-  atlas.sprites.set(key, sp);
-  return sp;
+// one sprite blit, held back until every sprite for the frame has been rasterised
+type Blit = {
+  key: string;
+  text: string;
+  font: string;
+  fill: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
 };
 
 const NAME_SPRITE_PX = 24;
@@ -188,9 +107,8 @@ const placeTerritoryNames = (
   sy: number,
   tx: number,
   ty: number,
-  atlas: Atlas,
   blockers: Rect[],
-  draws: Draw[]
+  queue: Blit[]
 ) => {
   const ppu = Math.abs(sx);
   const placed: Rect[] = [];
@@ -204,7 +122,7 @@ const placeTerritoryNames = (
     const fill = `rgba(${Math.min(255, r + 60)},${Math.min(255, g + 60)},${Math.min(255, b + 60)},0.95)`;
     const key = `t|${f.community}`;
     const font = `600 ${NAME_SPRITE_PX}px ${cssToken("--font-sans")}`;
-    const box = measure(key, name, font);
+    const box = measure(key, name, font, LABEL_PAD);
     const scale = size / NAME_SPRITE_PX;
     const w = box.width * scale;
     const h = box.height * scale;
@@ -215,7 +133,7 @@ const placeTerritoryNames = (
     placed.push(rect);
     if (!overlaps(rect, screen)) continue;
     blockers.push(rect);
-    draws.push({ sp: sprite(atlas, key, name, font, fill), x: rect[0], y: rect[1], w, h });
+    queue.push({ key, text: name, font, fill, x: rect[0], y: rect[1], w, h });
   }
 };
 
@@ -223,6 +141,8 @@ export const pixelsPerUnit = (graph: Graph): number => Math.abs(cameraAffine(gra
 
 export type LabelHit = { node: number; rect: Rect };
 
+// during the intro s.positions are pulled toward the centre by spread, while s.index was built
+// from the uncontracted layout; 1 once the animation has finished
 export const drawOverlay = (
   graph: Graph,
   canvas: HTMLCanvasElement,
@@ -246,17 +166,24 @@ export const drawOverlay = (
   const screen: Rect = [0, 0, w, h];
   const blockers: Rect[] = [];
   const atlas = atlasFor(dpr);
-  const draws: Draw[] = [];
-  const blit = () => {
-    for (const d of draws)
-      ctx.drawImage(atlas.canvas, d.sp.x, d.sp.y, d.sp.w, d.sp.h, d.x, d.y, d.w, d.h);
+  const outline = cssToken("--color-page-dim");
+  const queue: Blit[] = [];
+  // every sprite is rasterised into the atlas before any is read back out of it. interleaving
+  // the two costs a surface sync per label where the driver cannot share the atlas canvas
+  const flush = (): LabelHit[] => {
+    const fresh = queue.map((b) =>
+      sprite(atlas, b.key, b.text, b.font, b.fill, outline, LABEL_PAD)
+    );
+    for (let i = 0; i < queue.length; i++) {
+      const b = queue[i];
+      const sp = fresh[i];
+      ctx.drawImage(atlas.canvas, sp.x, sp.y, sp.w, sp.h, b.x, b.y, b.w, b.h);
+    }
     return hits;
   };
-
-  const terr = s.territories ? s.regions : null;
-  if (terr) placeTerritoryNames(terr, screen, sx, sy, tx, ty, atlas, blockers, draws);
-
   const sizeScale = sizeScaleFor(ppu);
+
+  // the ring and the path go under every label
   if (s.hovered !== null && s.sizes[s.hovered] > 0) {
     const x = s.positions[s.hovered * 2] * sx + tx;
     const y = s.positions[s.hovered * 2 + 1] * sy + ty;
@@ -291,7 +218,10 @@ export const drawOverlay = (
     }
   }
 
-  if (!s.labels || !s.names || !s.zooms) return blit();
+  const terr = s.territories ? s.regions : null;
+  if (terr) placeTerritoryNames(terr, screen, sx, sy, tx, ty, blockers, queue);
+
+  if (!s.labels || !s.names || !s.zooms) return flush();
   const names = s.names;
   const label = (i: number, strong: boolean): Rect | null => {
     const x = s.positions[i * 2] * sx + tx;
@@ -302,19 +232,13 @@ export const drawOverlay = (
     const text = names.at(i);
     const key = `${strong ? "s" : "p"}${size}|${s.categories[i]}|${text}`;
     const font = `${strong ? 700 : 500} ${size}px ${cssToken("--font-sans")}`;
-    const box = measure(key, text, font);
+    const box = measure(key, text, font, LABEL_PAD);
     const lx = x + (s.sizes[i] * sizeScale) / 2 + LABEL_LEFT;
     const rect: Rect = [lx, y - box.height / 2, lx + box.width, y + box.height / 2];
     if (!strong && (!overlaps(rect, screen) || blockers.some((p) => overlaps(p, rect))))
       return null;
     hits.push({ node: i, rect });
-    draws.push({
-      sp: sprite(atlas, key, text, font, fill),
-      x: rect[0],
-      y: rect[1],
-      w: box.width,
-      h: box.height
-    });
+    queue.push({ key, text, font, fill, x: rect[0], y: rect[1], w: box.width, h: box.height });
     return rect;
   };
   const forced = (i: number | null) => {
@@ -345,6 +269,7 @@ export const drawOverlay = (
   const prefix = starts[zoomBucket(ppuEff) + 1];
   const { index } = s;
   const centre = (index.cells * index.size) / 2;
+  // undo the contraction to look the coordinate up in the uncontracted index
   const clampCell = (v: number) =>
     Math.min(
       index.cells - 1,
@@ -360,6 +285,7 @@ export const drawOverlay = (
       const c = cx + cy * index.cells;
       covered += index.off[c + 1] - index.off[c];
     }
+  // both reach the same labels; walk whichever list is shorter at this zoom
   if (prefix <= covered) {
     for (let k = 0; k < prefix; k++) place(order[k]);
   } else {
@@ -369,7 +295,7 @@ export const drawOverlay = (
         for (let e = index.off[c]; e < index.off[c + 1]; e++) place(index.nodes[e]);
       }
   }
-  return blit();
+  return flush();
 };
 
 export const labelAt = (hits: LabelHit[], x: number, y: number): number | null => {

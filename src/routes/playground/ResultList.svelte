@@ -1,9 +1,9 @@
 <script lang="ts">
+  import type { Names } from "$lib/core/strings";
   import type { Communities, Core } from "$lib/data/dataset";
-  import type { Names } from "$lib/data/names";
+  import { formatCount } from "$lib/data/search";
   import type { Hit } from "$lib/data/vectors";
-  import { categoryCss, categoryHoverCss } from "$lib/map/palette";
-  import { formatCount } from "$lib/search";
+  import { categoryCss, categoryHoverCss } from "$lib/render/palette";
   import { tagPath } from "$lib/tagpath";
   import Minus from "@lucide/svelte/icons/minus";
   import Plus from "@lucide/svelte/icons/plus";

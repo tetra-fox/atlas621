@@ -1,4 +1,13 @@
-import { LABEL_PAD, LABEL_SIZES, labelFontSize, labelZooms, type LabelZooms } from "./labels";
+import { labelZooms, type LabelZooms } from "$lib/core/declutter";
+import {
+  LABEL_GAP_X,
+  LABEL_GAP_Y,
+  LABEL_PAD,
+  LABEL_SIZES,
+  labelBoxHeight,
+  labelFontSize
+} from "$lib/render/labels";
+import { radiusFor } from "$lib/render/palette";
 
 export type LabelsRequest = {
   positions: Float32Array;
@@ -62,5 +71,12 @@ const post = (zooms: LabelZooms, done: number) => {
 self.onmessage = (event: MessageEvent<LabelsRequest>) => {
   const { positions, postCounts, offsets, bytes, font, space, zoomMax } = event.data;
   const widths = labelWidths(offsets, bytes, postCounts, font);
-  post(labelZooms(positions, postCounts, widths, space, zoomMax, post), postCounts.length);
+  const n = postCounts.length;
+  const reach = new Float32Array(n);
+  const halfH = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    reach[i] = 2 * radiusFor(postCounts[i]) + widths[i] + LABEL_GAP_X;
+    halfH[i] = labelBoxHeight(labelFontSize(postCounts[i])) / 2;
+  }
+  post(labelZooms(positions, reach, halfH, LABEL_GAP_Y, space, zoomMax, post), n);
 };

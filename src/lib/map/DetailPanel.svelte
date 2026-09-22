@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { Names } from "$lib/core/strings";
   import {
     loadNodeText,
     type Communities,
@@ -7,9 +8,10 @@
     type SearchEntry,
     type Years
   } from "$lib/data/dataset";
-  import type { Names } from "$lib/data/names";
+  import { WEIGHT_MAX } from "$lib/data/manifest";
   import { findPath } from "$lib/data/paths";
-  import { compactCount, formatCount } from "$lib/search";
+  import { compactCount, formatCount } from "$lib/data/search";
+  import { CATEGORY_NAMES, categoryCss, categoryHoverCss } from "$lib/render/palette";
   import ChevronRight from "@lucide/svelte/icons/chevron-right";
   import ExternalLink from "@lucide/svelte/icons/external-link";
   import X from "@lucide/svelte/icons/x";
@@ -18,7 +20,6 @@
   import { tick } from "svelte";
 
   import { yearRow } from "./graphdata";
-  import { CATEGORY_NAMES, categoryCss, categoryHoverCss } from "./palette";
   import SearchBox from "./SearchBox.svelte";
   import Sparkline from "./Sparkline.svelte";
   import { getMapState } from "./state.svelte";
@@ -50,14 +51,15 @@
     if (!e) return [];
     const out: { node: number; weight: number; count: number }[] = [];
     for (let k = 0; k + 2 < e.length; k += 3)
-      out.push({ node: e[k], weight: e[k + 1] / 65535, count: e[k + 2] });
+      out.push({ node: e[k], weight: e[k + 1] / WEIGHT_MAX, count: e[k + 2] });
     return out;
   });
   const similar = $derived.by(() => {
     const s = text?.t?.s;
     if (!s) return [];
     const out: { node: number; weight: number }[] = [];
-    for (let k = 0; k + 1 < s.length; k += 2) out.push({ node: s[k], weight: s[k + 1] / 65535 });
+    for (let k = 0; k + 1 < s.length; k += 2)
+      out.push({ node: s[k], weight: s[k + 1] / WEIGHT_MAX });
     return out;
   });
   $effect(() => {

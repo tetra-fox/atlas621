@@ -1,24 +1,11 @@
+import { eachHexCell, HEX_ACROSS, hexCenter, hexCorners } from "$lib/core/hex";
 import type { TerritoryLevel } from "$lib/data/dataset";
 
 import { communityColor } from "./palette";
 
-const SQRT3 = Math.sqrt(3);
-const ACROSS = [
-  [1, 0],
-  [0, 1],
-  [-1, 1],
-  [-1, 0],
-  [0, -1],
-  [1, -1]
-];
 const BITS = 15;
 const OFF = 1 << (BITS - 1);
 const cellKey = (q: number, r: number) => ((q + OFF) << BITS) | (r + OFF);
-
-export const hexCenter = (level: TerritoryLevel, q: number, r: number): [number, number] => [
-  level.hex_size * 1.5 * q + level.origin[0],
-  level.hex_size * SQRT3 * (r + q / 2) + level.origin[1]
-];
 
 const FILL_ALPHA = 0.09;
 const LINE_ALPHA = 0.35;
@@ -94,10 +81,8 @@ export const createTerritoryGl = (
   const gl = canvas.getContext("webgl2", { premultipliedAlpha: true, antialias: true });
   if (!gl) return null;
 
-  const radius = level.hex_size;
-  const half = (radius * SQRT3) / 2;
-  const dx = [radius, radius / 2, -radius / 2, -radius, -radius / 2, radius / 2];
-  const dy = [0, half, half, 0, -half, -half];
+  const grid = { size: level.hex_size, origin: level.origin };
+  const { dx, dy } = hexCorners(grid);
   const fill: number[] = [];
   const line: number[] = [];
   const push = (out: number[], x: number, y: number, c: number[], dx = 0, dy = 0, side = 0) =>
@@ -107,18 +92,16 @@ export const createTerritoryGl = (
     const fc = [(r / 255) * FILL_ALPHA, (g / 255) * FILL_ALPHA, (b / 255) * FILL_ALPHA, FILL_ALPHA];
     const lc = [(r / 255) * LINE_ALPHA, (g / 255) * LINE_ALPHA, (b / 255) * LINE_ALPHA, LINE_ALPHA];
     const cells = new Set<number>();
-    for (let i = 0; i < f.hexes.length; i += 2) cells.add(cellKey(f.hexes[i], f.hexes[i + 1]));
-    for (let i = 0; i < f.hexes.length; i += 2) {
-      const q = f.hexes[i];
-      const r = f.hexes[i + 1];
-      const [cx, cy] = hexCenter(level, q, r);
+    eachHexCell(f.hexes, (q, r) => cells.add(cellKey(q, r)));
+    eachHexCell(f.hexes, (q, r) => {
+      const [cx, cy] = hexCenter(grid, q, r);
       for (let k = 1; k < 5; k++) {
         push(fill, cx + dx[0], cy + dy[0], fc);
         push(fill, cx + dx[k], cy + dy[k], fc);
         push(fill, cx + dx[k + 1], cy + dy[k + 1], fc);
       }
       for (let k = 0; k < 6; k++) {
-        if (cells.has(cellKey(q + ACROSS[k][0], r + ACROSS[k][1]))) continue;
+        if (cells.has(cellKey(q + HEX_ACROSS[k][0], r + HEX_ACROSS[k][1]))) continue;
         const k1 = (k + 1) % 6;
         const x0 = cx + dx[k];
         const y0 = cy + dy[k];
@@ -133,7 +116,7 @@ export const createTerritoryGl = (
         push(line, x1, y1, lc, ex, ey, 1);
         push(line, x0, y0, lc, ex, ey, 1);
       }
-    }
+    });
   }
 
   const program = gl.createProgram();

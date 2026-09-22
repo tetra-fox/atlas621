@@ -1,10 +1,12 @@
 <script module lang="ts">
+  import { cssToken } from "$lib/core/css";
+  import type { LabelZooms } from "$lib/core/declutter";
+  import type { Names } from "$lib/core/strings";
   import {
     loadBase,
     loadCommunities,
     loadCore,
     loadImplications,
-    loadLabelZooms,
     loadManifest,
     loadNames,
     loadTerritories,
@@ -16,21 +18,19 @@
     type Territories,
     type Years
   } from "$lib/data/dataset";
+  import type { Manifest } from "$lib/data/manifest";
   import {
     beginStep,
     paint,
     resetProgress,
     STEPS,
     watchProgress,
-    type Manifest,
     type Progress
-  } from "$lib/data/format";
-  import type { Names } from "$lib/data/names";
+  } from "$lib/data/progress";
 
   import { mark } from "./bench";
-  import type { LabelZooms } from "./labels";
+  import { loadLabelZooms } from "./labelzooms";
   import { ZOOM_MAX } from "./MapCanvas.svelte";
-  import { cssToken } from "./palette";
 
   type LabelFeed = { latest: LabelZooms | null; onchange: ((zooms: LabelZooms) => void) | null };
 
@@ -103,8 +103,9 @@
   import { goto, replaceState } from "$app/navigation";
   import { resolve } from "$app/paths";
   import { page } from "$app/state";
-  import Nav from "$lib/Nav.svelte";
+  import { glRenderer, startFpsMeter, startHitchWatch, type Hitch } from "$lib/core/frames";
   import { tagPath } from "$lib/tagpath";
+  import Nav from "$lib/ui/Nav.svelte";
   import Settings from "@lucide/svelte/icons/settings";
   import X from "@lucide/svelte/icons/x";
   import NumberFlow, { NumberFlowGroup } from "@number-flow/svelte";
@@ -114,7 +115,6 @@
 
   import { workDuring, type BenchMode, type Mark, type StepReport } from "./bench";
   import Controls from "./Controls.svelte";
-  import { glRenderer, startFpsMeter, startHitchWatch, type Hitch } from "./debug";
   import DetailPanel from "./DetailPanel.svelte";
   import LinksWorker from "./links.worker?worker";
   import type { LinksInit } from "./links.worker";
@@ -478,7 +478,7 @@
         {#if benchOpen}
           {@const log = bench ? bench.lines.join("\n") : "no run yet"}
           <div
-            class="pointer-events-auto absolute right-2 bottom-14 flex h-96 max-h-[calc(100svh-6rem)] w-[44rem] max-w-[calc(100vw-1rem)] flex-col gap-1 rounded-sm bg-page/95 p-2 text-xs text-muted backdrop-blur">
+            class="pointer-events-auto absolute right-2 bottom-14 flex h-96 max-h-[calc(100svh-6rem)] w-176 max-w-[calc(100vw-1rem)] flex-col gap-1 rounded-sm bg-page/95 p-2 text-xs text-muted backdrop-blur">
             <div class="flex items-center gap-1">
               <span class="mr-1 font-bold text-ink">bench</span>
               {#each BENCH_MODES as mode (mode)}

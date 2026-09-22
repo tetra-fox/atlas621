@@ -1,5 +1,8 @@
+import { Cursor } from "$lib/core/binary";
+
 import { loadNodeText } from "./dataset";
-import { Cursor, fetchGz, type Manifest } from "./format";
+import { fetchGz } from "./fetch";
+import { WEIGHT_MAX, type Manifest } from "./manifest";
 
 export type PathGraph = {
   nodes: Uint32Array;
@@ -76,7 +79,7 @@ class Heap {
   }
 }
 
-const cost = (weight: number) => -Math.log(Math.max(weight, 1) / 65535);
+const cost = (weight: number) => -Math.log(Math.max(weight, 1) / WEIGHT_MAX);
 
 export const findPath = async (
   manifest: Manifest,
@@ -85,7 +88,7 @@ export const findPath = async (
 ): Promise<TagPath | null> => {
   const g = await loadPathGraph(manifest);
   const entries = async (node: number): Promise<[number, number][]> => {
-    if (g.row[node] >= 0) return [[node, 65535]];
+    if (g.row[node] >= 0) return [[node, WEIGHT_MAX]];
     const e = (await loadNodeText(manifest, node))?.e ?? [];
     const out: [number, number][] = [];
     for (let k = 0; k + 2 < e.length; k += 3) if (g.row[e[k]] >= 0) out.push([e[k], e[k + 1]]);
@@ -125,7 +128,7 @@ export const findPath = async (
   }
   let best = -1;
   let bestTotal = Infinity;
-  let exit = 65535;
+  let exit = WEIGHT_MAX;
   for (const [node, w] of ends) {
     const r = g.row[node];
     const total = dist[r] + (node === to ? 0 : cost(w));
@@ -140,14 +143,14 @@ export const findPath = async (
   for (let r = best; r >= 0; r = pred[r]) rows.push(r);
   rows.reverse();
   const nodes = rows.map((r) => g.nodes[r]);
-  const weights = rows.slice(1).map((r) => via[r] / 65535);
+  const weights = rows.slice(1).map((r) => via[r] / WEIGHT_MAX);
   if (nodes[0] !== from) {
     nodes.unshift(from);
-    weights.unshift(via[rows[0]] / 65535);
+    weights.unshift(via[rows[0]] / WEIGHT_MAX);
   }
   if (nodes[nodes.length - 1] !== to) {
     nodes.push(to);
-    weights.push(exit / 65535);
+    weights.push(exit / WEIGHT_MAX);
   }
   return { nodes, weights };
 };

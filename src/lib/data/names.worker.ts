@@ -1,4 +1,4 @@
-import { buildTable } from "./names";
+import { buildTable } from "$lib/core/strings";
 
 export type NamesRequest = { count: number; buffer: ArrayBuffer };
 export type NamesResponse = { buffer: ArrayBuffer; table: Uint32Array };

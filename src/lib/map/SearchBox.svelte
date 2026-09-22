@@ -1,12 +1,11 @@
 <script lang="ts">
+  import type { Names } from "$lib/core/strings";
   import type { Core, SearchEntry } from "$lib/data/dataset";
-  import type { Names } from "$lib/data/names";
-  import { formatCount, search, topByCount, type SearchResult } from "$lib/search";
+  import { formatCount, search, topByCount, type SearchResult } from "$lib/data/search";
+  import { CATEGORY_NAMES, categoryCss } from "$lib/render/palette";
   import ArrowRight from "@lucide/svelte/icons/arrow-right";
   import Search from "@lucide/svelte/icons/search";
   import { Combobox } from "bits-ui";
-
-  import { CATEGORY_NAMES, categoryCss } from "./palette";
 
   type Props = { core: Core | null; names: Names | null; onpick: (entry: SearchEntry) => void };
   let { core, names, onpick }: Props = $props();

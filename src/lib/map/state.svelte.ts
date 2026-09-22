@@ -1,8 +1,8 @@
 import type { TagPath } from "$lib/data/paths";
+import { CATEGORY_COUNT } from "$lib/render/palette";
 import { createContext } from "svelte";
 
 import { FULL_DENSITY } from "./linkselect";
-import { CATEGORY_COUNT } from "./palette";
 
 export type ColorMode = "category" | "birth";
 

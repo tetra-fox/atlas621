@@ -1,14 +1,16 @@
-export const hashBytes = (bytes: Uint8Array, start: number, end: number): number => {
-  let h = 0x811c9dc5;
+const FNV_OFFSET = 0x811c9dc5;
+const FNV_PRIME = 0x01000193;
+
+const hashBytes = (bytes: Uint8Array, start: number, end: number): number => {
+  let h = FNV_OFFSET;
   for (let i = start; i < end; i++) {
     h ^= bytes[i];
-    h = Math.imul(h, 0x01000193);
+    h = Math.imul(h, FNV_PRIME);
   }
   return h >>> 0;
 };
 
-export const tableSize = (count: number): number =>
-  1 << Math.ceil(Math.log2(Math.max(2, count * 2)));
+const tableSize = (count: number): number => 1 << Math.ceil(Math.log2(Math.max(2, count * 2)));
 
 export const buildTable = (offsets: Uint32Array, bytes: Uint8Array, count: number): Uint32Array => {
   const table = new Uint32Array(tableSize(count));

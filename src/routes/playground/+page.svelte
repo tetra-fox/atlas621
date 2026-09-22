@@ -2,6 +2,7 @@
   import { replaceState } from "$app/navigation";
   import { resolve } from "$app/paths";
   import { page } from "$app/state";
+  import type { Names } from "$lib/core/strings";
   import {
     loadCommunities,
     loadCore,
@@ -11,7 +12,7 @@
     type Communities,
     type Core
   } from "$lib/data/dataset";
-  import type { Names } from "$lib/data/names";
+  import { formatCount } from "$lib/data/search";
   import {
     blend,
     combine,
@@ -21,10 +22,9 @@
     type Hit,
     type Vectors
   } from "$lib/data/vectors";
-  import { categoryCss, categoryHoverCss } from "$lib/map/palette";
-  import Nav from "$lib/Nav.svelte";
-  import { formatCount } from "$lib/search";
+  import { CATEGORY_GENERAL, categoryCss, categoryHoverCss } from "$lib/render/palette";
   import { tagPath } from "$lib/tagpath";
+  import Nav from "$lib/ui/Nav.svelte";
   import Dices from "@lucide/svelte/icons/dices";
   import ExternalLink from "@lucide/svelte/icons/external-link";
 
@@ -107,7 +107,7 @@
       let i = 0;
       for (let tries = 0; tries < 20; tries++) {
         i = Math.floor(Math.random() * pool);
-        if (core.categories[i] === 0 && !picked.has(i)) break;
+        if (core.categories[i] === CATEGORY_GENERAL && !picked.has(i)) break;
       }
       picked.add(i);
       out.push(n.at(i));

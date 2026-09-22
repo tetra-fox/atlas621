@@ -1,5 +1,5 @@
-import { setDataVersion } from "$lib/data/format";
-import { loadAdjacencyShard, loadTile, type AdjacencyShard, type Tile } from "$lib/data/tiles";
+import { setDataVersion } from "$lib/data/fetch";
+import { loadAdjacencyShard, loadTile, type AdjacencyShard, type EdgeRun } from "$lib/data/tiles";
 
 import {
   baseMembership,
@@ -61,7 +61,7 @@ export type LinksResponse =
 let data: LinkInput | null = null;
 let inBase: Uint8Array | null = null;
 let tileFiles = new Set<string>();
-const tiles = new Map<string, Promise<Tile>>();
+const tiles = new Map<string, Promise<EdgeRun>>();
 const shards = new Map<number, Promise<AdjacencyShard>>();
 let latestDetail = 0;
 let latestForced = 0;
@@ -71,7 +71,7 @@ const post = (message: LinksResponse, transfer: Transferable[] = []) =>
 const failed = (e: unknown) =>
   post({ type: "error", message: e instanceof Error ? e.message : String(e) });
 
-const tileAt = (name: string): Promise<Tile> => {
+const tileAt = (name: string): Promise<EdgeRun> => {
   let p = tiles.get(name);
   if (!p) {
     p = loadTile(name);
@@ -89,10 +89,10 @@ const shardAt = (shard: number, d: LinkInput): Promise<AdjacencyShard> => {
   return p;
 };
 
-const tilesFor = (d: LinkInput, level: number, view: SpaceView): Promise<Tile>[] => {
+const tilesFor = (d: LinkInput, level: number, view: SpaceView): Promise<EdgeRun>[] => {
   const cells = 1 << level;
   const at = (v: number) => Math.min(cells - 1, Math.max(0, Math.floor((v / d.space) * cells)));
-  const out: Promise<Tile>[] = [];
+  const out: Promise<EdgeRun>[] = [];
   for (let y = at(view.minY); y <= at(view.maxY); y++)
     for (let x = at(view.minX); x <= at(view.maxX); x++) {
       const name = `tiles/${level}/${x}_${y}.bin.gz`;

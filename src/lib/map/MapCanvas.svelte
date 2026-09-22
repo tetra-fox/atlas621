@@ -10,18 +10,11 @@
 
 <script lang="ts">
   import { dev } from "$app/environment";
+  import { cssToken } from "$lib/core/css";
+  import type { LabelZooms } from "$lib/core/declutter";
+  import type { Names } from "$lib/core/strings";
   import type { Communities, Core, Territories, Years } from "$lib/data/dataset";
-  import { beginStep, endStep, paint } from "$lib/data/format";
-  import type { Names } from "$lib/data/names";
-  import { Graph } from "@cosmos.gl/graph";
-  import { untrack } from "svelte";
-  import type { Attachment } from "svelte/attachments";
-
-  import { mark, runBench, type BenchEvent, type BenchMode } from "./bench";
-  import { countsWithin, lastDayOfYear, pointColors, visibleSizes } from "./graphdata";
-  import type { LabelZooms } from "./labels";
-  import type { LinksRequest, LinksResponse, SceneResponse } from "./links.worker";
-  import { baseShownFor, detailSlotsFor, type SpaceView } from "./linkselect";
+  import { beginStep, endStep, paint } from "$lib/data/progress";
   import {
     buildLabelIndex,
     cameraAffine,
@@ -30,10 +23,18 @@
     pixelsPerUnit,
     prepareTerritories,
     type LabelHit
-  } from "./overlay";
-  import { cssToken, sizeScaleFor } from "./palette";
+  } from "$lib/render/overlay";
+  import { sizeScaleFor } from "$lib/render/palette";
+  import { createTerritoryGl, type TerritoryGl } from "$lib/render/territories.gl";
+  import { Graph } from "@cosmos.gl/graph";
+  import { untrack } from "svelte";
+  import type { Attachment } from "svelte/attachments";
+
+  import { mark, runBench, type BenchEvent, type BenchMode } from "./bench";
+  import { countsWithin, lastDayOfYear, pointColors, visibleSizes } from "./graphdata";
+  import type { LinksRequest, LinksResponse, SceneResponse } from "./links.worker";
+  import { baseShownFor, detailSlotsFor, type SpaceView } from "./linkselect";
   import { getMapState } from "./state.svelte";
-  import { createTerritoryGl, type TerritoryGl } from "./territories.gl";
 
   type Props = {
     core: Core;
@@ -113,6 +114,7 @@
     };
   });
   let hexLayer = $state<HTMLDivElement>();
+  // the size of the --hex-tile svg in app.css; the strip scrolls by whole tiles so it never jumps
   const HEX_PERIOD_X = 30;
   const HEX_PERIOD_Y = 10 * Math.sqrt(3);
   let hexCamera: { zoom: number; x: number; y: number } | null = null;
@@ -321,10 +323,11 @@
     frame = requestAnimationFrame(() => {
       frame = 0;
       if (!graph || !overlay || !latestOverlay) return;
-      const t0 = performance.now();
       const dpr = window.devicePixelRatio || 1;
       const labelRatio = Math.min(dpr, cameraMoving ? labelRatioMoving : labelRatioCap);
+      const t0 = performance.now();
       labelHits = drawOverlay(graph, overlay, latestOverlay, labelRatio, introSpread);
+      const t1 = performance.now();
       if (territoryGl) {
         if (latestOverlay.territories)
           territoryGl.draw(
@@ -335,7 +338,8 @@
           );
         else territoryGl.clear();
       }
-      mark("overlay", performance.now() - t0, { labels: labelHits.length });
+      mark("overlay.labels", t1 - t0, { labels: labelHits.length, ratio: labelRatio });
+      mark("overlay.territory", performance.now() - t1, {});
     });
   };
   $effect(() => {
@@ -460,6 +464,7 @@
         zoomTuned = true;
         e.target
           .scaleExtent([ZOOM_MIN, ZOOM_MAX])
+          // deltaMode 0 is pixels, 1 lines, 2 pages; convert to pixels before scaling
           .wheelDelta(
             (w) =>
               (-w.deltaY *
@@ -554,6 +559,8 @@
     revealed = true;
     const g = graph;
     beginStep("compiling shaders");
+    // one frame so the step label paints, one to draw the first labels, one to clear the
+    // step before the intro animation starts
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         if (overlay && latestOverlay)

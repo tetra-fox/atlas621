@@ -3,8 +3,8 @@
   import { resolve } from "$app/paths";
   import { page } from "$app/state";
   import { loadChangelog, type ChangelogEntry } from "$lib/data/dataset";
-  import Nav from "$lib/Nav.svelte";
   import { tagPath } from "$lib/tagpath";
+  import Nav from "$lib/ui/Nav.svelte";
   import ArrowRight from "@lucide/svelte/icons/arrow-right";
   import ChevronDown from "@lucide/svelte/icons/chevron-down";
   import ChevronLeft from "@lucide/svelte/icons/chevron-left";

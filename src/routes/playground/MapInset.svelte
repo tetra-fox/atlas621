@@ -75,7 +75,7 @@
 
 <canvas
   bind:this={canvas}
-  class="aspect-square w-full max-w-[300px] rounded-sm bg-page-dim"
+  class="aspect-square w-full max-w-75 rounded-sm bg-page-dim"
   style:width="{SIZE}px"
   style:height="{SIZE}px"
   aria-label="where the results sit on the map"></canvas>
