@@ -15,6 +15,7 @@ use std::time::{Duration, Instant};
 use anyhow::{Context, Result};
 use atlas_core::{communities, edges, embed, hex, layout, tsne};
 use clap::{Args, Parser, Subcommand};
+use directories::ProjectDirs;
 
 use store::Store;
 use tracing::{debug, error, info};
@@ -266,12 +267,12 @@ struct AllArgs {
     emit: EmitArgs,
 }
 
+// ~/.cache/atlas621 on linux, ~/Library/Caches/atlas621 on macos, the local appdata cache on
+// windows. falls back to a directory beside the work dir when there is no home to put it in
 fn default_cache_dir() -> PathBuf {
-    let base = std::env::var_os("XDG_CACHE_HOME")
-        .map(PathBuf::from)
-        .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".cache")))
-        .unwrap_or_else(|| PathBuf::from(".cache"));
-    base.join("atlas621").join("exports")
+    ProjectDirs::from("", "", "atlas621")
+        .map_or_else(|| PathBuf::from(".cache"), |d| d.cache_dir().to_path_buf())
+        .join("exports")
 }
 
 struct Ctx {
