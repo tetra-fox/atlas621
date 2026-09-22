@@ -42,6 +42,7 @@
     "@leeoniya/ufuzzy": "^1.0.19",
     "@lucide/svelte": "^1.46.0",
     "@number-flow/svelte": "^0.4.2",
+    "apache-arrow": "^21.2.0",
     "bits-ui": "^2.19.2"
   }
 }

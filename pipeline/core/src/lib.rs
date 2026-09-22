@@ -4,6 +4,7 @@ pub mod csr;
 pub mod edges;
 pub mod embed;
 pub mod hex;
+pub mod ipc;
 pub mod layout;
 pub mod pairs;
 pub mod quadtree;

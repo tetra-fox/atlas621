@@ -80,10 +80,10 @@ const tileAt = (name: string): Promise<EdgeRun> => {
   return p;
 };
 
-const shardAt = (shard: number, d: LinkInput): Promise<AdjacencyShard> => {
+const shardAt = (shard: number): Promise<AdjacencyShard> => {
   let p = shards.get(shard);
   if (!p) {
-    p = loadAdjacencyShard(shard, d.adjShardSize, d.postCounts.length);
+    p = loadAdjacencyShard(shard);
     shards.set(shard, p);
   }
   return p;
@@ -137,7 +137,7 @@ const forced = async (msg: ForcedRequest, d: LinkInput) => {
     const s = Math.floor(msg.node / d.adjShardSize);
     first = s * d.adjShardSize;
     const t0 = performance.now();
-    shard = await shardAt(s, d);
+    shard = await shardAt(s);
     fetchMs = performance.now() - t0;
     if (msg.id !== latestForced) return;
   }

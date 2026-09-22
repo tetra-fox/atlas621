@@ -1,4 +1,4 @@
-import { Cursor } from "$lib/core/binary";
+import { readTable, values } from "$lib/core/table";
 
 import { fetchGz } from "./fetch";
 import type { Manifest } from "./manifest";
@@ -13,11 +13,10 @@ let loading: Promise<Vectors> | null = null;
 
 export const loadVectors = (manifest: Manifest): Promise<Vectors> => {
   loading ??= fetchGz("vectors.bin.gz").then((buffer) => {
-    const c = new Cursor(buffer);
-    const [k, dim] = c.u32(2);
-    const nodes = c.u32(k);
-    const bytes = c.u8(k * dim);
-    const data = new Int8Array(bytes.buffer, bytes.byteOffset, bytes.length);
+    const t = readTable(buffer);
+    const nodes = values<Uint32Array>(t, "node");
+    const data = values<Int8Array>(t, "vector");
+    const dim = data.length / nodes.length;
     const row = new Int32Array(manifest.nodes).fill(-1);
     nodes.forEach((node, r) => {
       row[node] = r;

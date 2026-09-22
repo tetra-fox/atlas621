@@ -68,7 +68,7 @@
       await Promise.all([
         coreLoading,
         namesLoading,
-        loadU16(manifest, "first_year.bin.gz", n, "first years"),
+        loadU16(manifest, "first_year.bin.gz", "first_year", "first years"),
         loadTerritories(manifest),
         loadCommunities(manifest),
         loadBase(manifest),

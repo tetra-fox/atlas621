@@ -12,7 +12,7 @@ import { radiusFor } from "$lib/render/palette";
 export type LabelsRequest = {
   positions: Float32Array;
   postCounts: Uint32Array;
-  offsets: Uint32Array;
+  offsets: Int32Array;
   bytes: Uint8Array;
   font: string;
   space: number;
@@ -21,7 +21,7 @@ export type LabelsRequest = {
 export type LabelsResponse = LabelZooms & { done: number };
 
 const labelWidths = (
-  offsets: Uint32Array,
+  offsets: Int32Array,
   bytes: Uint8Array,
   postCounts: Uint32Array,
   font: string

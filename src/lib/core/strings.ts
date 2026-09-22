@@ -12,7 +12,7 @@ const hashBytes = (bytes: Uint8Array, start: number, end: number): number => {
 
 const tableSize = (count: number): number => 1 << Math.ceil(Math.log2(Math.max(2, count * 2)));
 
-export const buildTable = (offsets: Uint32Array, bytes: Uint8Array, count: number): Uint32Array => {
+export const buildTable = (offsets: Int32Array, bytes: Uint8Array, count: number): Uint32Array => {
   const table = new Uint32Array(tableSize(count));
   const mask = table.length - 1;
   for (let i = 0; i < count; i++) {
@@ -30,7 +30,7 @@ export class Names {
   private readonly encoder = new TextEncoder();
 
   constructor(
-    readonly offsets: Uint32Array,
+    readonly offsets: Int32Array,
     readonly bytes: Uint8Array,
     private readonly table: Uint32Array
   ) {

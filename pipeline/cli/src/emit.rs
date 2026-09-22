@@ -11,14 +11,15 @@ use log::info;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 
-use atlas_core::bin::{self, Le};
+use atlas_core::bin::Le;
+use atlas_core::ipc::{self, Column};
 use atlas_core::edges::Edges;
 use atlas_core::embed::Embedding;
 use atlas_core::hex::{Feature, Level};
 
 use crate::posts::{PostStats, YEAR0};
 use crate::store::Store;
-use crate::tags::{self, Tags};
+use crate::tags::Tags;
 use crate::territories::{Meta, RegionInfo};
 
 // cloudflare rejects static assets over 25 MiB, kept under with a margin
@@ -128,17 +129,16 @@ impl Emitter {
         self.record(name)
     }
 
-    fn array<T: Le>(&mut self, name: &str, values: &[T]) -> Result<()> {
+    fn array<T: Column + Le>(&mut self, name: &str, values: &[T]) -> Result<()> {
+        let stem = name.strip_suffix(".bin.gz").unwrap_or(name);
+        let column = stem.rsplit('.').next().unwrap_or(stem);
         let per_part = PART_RAW / T::SIZE;
         if values.len() <= per_part {
-            return self.gz(name, |w| Ok(bin::write_all(w, values)?));
+            return self.gz(name, |w| ipc::one(w, column, values));
         }
-        let stem = name.strip_suffix(".bin.gz").unwrap_or(name);
         let chunks: Vec<&[T]> = values.chunks(per_part).collect();
         for (k, chunk) in chunks.iter().enumerate() {
-            self.gz(&format!("{stem}.{k}.bin.gz"), |w| {
-                Ok(bin::write_all(w, chunk)?)
-            })?;
+            self.gz(&format!("{stem}.{k}.bin.gz"), |w| ipc::one(w, column, chunk))?;
         }
         self.parts.insert(name.to_string(), chunks.len());
         Ok(())
@@ -425,9 +425,13 @@ fn adjacency_shards(
             Compression::best(),
         );
         let local: Vec<u32> = off[lo..=hi].iter().map(|&o| (o - start) as u32).collect();
-        bin::write_all(&mut enc, &local)?;
-        bin::write_all(&mut enc, &far[start..off[hi]])?;
-        bin::write_all(&mut enc, &w[start..off[hi]])?;
+        ipc::write(
+            &mut enc,
+            &[
+                ("far", ipc::runs(&local, &far[start..off[hi]])?),
+                ("weight", ipc::runs(&local, &w[start..off[hi]])?),
+            ],
+        )?;
         enc.finish()?.flush()?;
         total += fs::metadata(&path)?.len();
     }
@@ -444,12 +448,16 @@ fn gather<T: Copy>(keys: &[u32], src: &[T]) -> Vec<T> {
 }
 
 // a run of edges picked out of the global edge list by rank; read by readEdgeRun on the web side
-fn edge_run<W: Write>(w: &mut W, keys: &[u32], a: &[u32], b: &[u32], weight: &[u16]) -> Result<()> {
-    bin::write_all(w, keys)?;
-    bin::write_all(w, &gather(keys, a))?;
-    bin::write_all(w, &gather(keys, b))?;
-    bin::write_all(w, &gather(keys, weight))?;
-    Ok(())
+fn edge_run<W: Write>(w: W, keys: &[u32], a: &[u32], b: &[u32], weight: &[u16]) -> Result<()> {
+    ipc::write(
+        w,
+        &[
+            ("rank", u32::column(keys)),
+            ("a", u32::column(&gather(keys, a))),
+            ("b", u32::column(&gather(keys, b))),
+            ("weight", u16::column(&gather(keys, weight))),
+        ],
+    )
 }
 
 fn similar_lists(emb: &Embedding, take: usize, n: usize) -> Vec<Vec<(u32, u16)>> {
@@ -510,12 +518,14 @@ fn path_graph(e: &mut Emitter, ties: &Edges, post_counts: &[u32], floor: u32) ->
         }
     }
     e.gz("paths.bin.gz", |w| {
-        bin::write_all(w, &[nodes.len() as u32, m as u32])?;
-        bin::write_all(w, &nodes)?;
-        bin::write_all(w, &off)?;
-        bin::write_all(w, &far)?;
-        bin::write_all(w, &weight)?;
-        Ok(())
+        ipc::write(
+            w,
+            &[
+                ("node", u32::column(&nodes)),
+                ("far", ipc::runs(&off, &far)?),
+                ("weight", ipc::runs(&off, &weight)?),
+            ],
+        )
     })
 }
 
@@ -528,14 +538,14 @@ fn vectors(e: &mut Emitter, emb: &Embedding, post_counts: &[u32], floor: u32) ->
     let mut data = Vec::with_capacity(rows.len() * dim);
     for &i in &rows {
         for &v in &emb.vectors[i * dim..(i + 1) * dim] {
-            data.push((v.clamp(-1.0, 1.0) * 127.0).round() as i8 as u8);
+            data.push((v.clamp(-1.0, 1.0) * 127.0).round() as i8);
         }
     }
     e.gz("vectors.bin.gz", |w| {
-        bin::write_all(w, &[nodes.len() as u32, dim as u32])?;
-        bin::write_all(w, &nodes)?;
-        bin::write_all(w, &data)?;
-        Ok(())
+        ipc::write(
+            w,
+            &[("node", u32::column(&nodes)), ("vector", ipc::rows(dim, &data)?)],
+        )
     })
 }
 
@@ -575,7 +585,9 @@ pub fn write(out_dir: &Path, store: &Store, inputs: EmitInputs) -> Result<()> {
         .iter()
         .map(|p| [(p[0] as f64 * scale + ox) as f32, (p[1] as f64 * scale + oy) as f32])
         .collect();
-    e.array("positions.bin.gz", &positions)?;
+    e.gz("positions.bin.gz", |w| {
+        ipc::write(w, &[("position", ipc::rows(2, positions.as_flattened())?)])
+    })?;
     e.array("post_counts.bin.gz", &tags.post_counts[..n])?;
     e.array("categories.bin.gz", &tags.categories[..n])?;
     e.array("tag_ids.bin.gz", &tags.ids[..n])?;
@@ -590,11 +602,7 @@ pub fn write(out_dir: &Path, store: &Store, inputs: EmitInputs) -> Result<()> {
     e.array("continent.bin.gz", &to_u16(inputs.continent))?;
 
     e.gz("names.bin.gz", |w| {
-        bin::write_all(w, &tags::name_offsets(&tags.names[..n]))?;
-        for name in &tags.names[..n] {
-            w.write_all(name.as_bytes())?;
-        }
-        Ok(())
+        ipc::write(w, &[("name", ipc::strings(&tags.names[..n]))])
     })?;
 
     let quantized: Vec<u16> = inputs.edges.weight.iter().map(|&w| quantize(w)).collect();

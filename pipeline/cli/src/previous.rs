@@ -2,6 +2,8 @@ use anyhow::{Context, Result};
 use log::info;
 use rustc_hash::FxHashMap;
 
+const ARROW_MAGIC: &[u8] = b"ARROW1";
+
 use crate::tags::Tags;
 
 pub fn seed_positions(tags: &Tags, previous: &str) -> Result<Vec<[f32; 2]>> {
@@ -25,18 +27,28 @@ pub fn seed_positions(tags: &Tags, previous: &str) -> Result<Vec<[f32; 2]>> {
     let n_old = manifest["nodes"]
         .as_u64()
         .context("previous manifest has no node count")? as usize;
-    let positions: Vec<[f32; 2]> =
-        atlas_core::bin::read_all(&mut &gunzip(fetch("positions.bin.gz")?)?[..])?;
+    let position_blob = gunzip(fetch("positions.bin.gz")?)?;
     let names_blob = gunzip(fetch("names.bin.gz")?)?;
-    let offsets: Vec<u32> = atlas_core::bin::read_all(&mut &names_blob[..(n_old + 1) * 4])?;
-    let text = std::str::from_utf8(&names_blob[(n_old + 1) * 4..])?;
-    let by_name: FxHashMap<&str, [f32; 2]> = (0..n_old)
-        .map(|i| {
-            (
-                &text[offsets[i] as usize..offsets[i + 1] as usize],
-                positions[i],
-            )
-        })
+    // TODO remove the raw branch once a rebuild has published arrow, which is the only reason a
+    // deploy older than that format can still be the previous one
+    let (positions, names) = if position_blob.starts_with(ARROW_MAGIC) {
+        (
+            atlas_core::ipc::read_pairs(&position_blob, "position")?,
+            atlas_core::ipc::read_strings(&names_blob, "name")?,
+        )
+    } else {
+        let positions = atlas_core::bin::read_all(&mut &position_blob[..])?;
+        let offsets: Vec<u32> = atlas_core::bin::read_all(&mut &names_blob[..(n_old + 1) * 4])?;
+        let text = std::str::from_utf8(&names_blob[(n_old + 1) * 4..])?;
+        let names = (0..n_old)
+            .map(|i| text[offsets[i] as usize..offsets[i + 1] as usize].to_string())
+            .collect();
+        (positions, names)
+    };
+    let by_name: FxHashMap<&str, [f32; 2]> = names
+        .iter()
+        .map(String::as_str)
+        .zip(positions.iter().copied())
         .collect();
     let mut found = 0;
     let seeded = tags.names[..tags.n_nodes]

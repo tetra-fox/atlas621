@@ -1,3 +1,5 @@
+import { readTable, values } from "$lib/core/table";
+
 import type { Manifest } from "./manifest";
 import { begin, counted, finish, type Bytes } from "./progress";
 
@@ -79,26 +81,30 @@ export const fetchGz = async (
   return buffer;
 };
 
-export const fetchArray = async (
+// a file the emitter may have split to stay under the asset size cap; the parts share a schema,
+// so the column is read from each and joined
+export const fetchColumn = async <T extends { length: number; set: (a: T, o: number) => void }>(
   manifest: Manifest,
   name: string,
+  column: string,
   label?: string
-): Promise<ArrayBuffer> => {
+): Promise<T> => {
   const count = manifest.parts[name];
-  if (!count) return fetchGz(name, manifest.files[name], label);
+  if (!count) return values<T>(readTable(await fetchGz(name, manifest.files[name], label)), column);
   const stem = name.replace(/\.bin\.gz$/, "");
   const parts = await Promise.all(
-    Array.from({ length: count }, (_, k) => {
+    Array.from({ length: count }, async (_, k) => {
       const part = `${stem}.${k}.bin.gz`;
-      return fetchGz(part, manifest.files[part], label && `${label} ${k + 1}/${count}`);
+      const b = await fetchGz(part, manifest.files[part], label && `${label} ${k + 1}/${count}`);
+      return values<T>(readTable(b), column);
     })
   );
-  const total = parts.reduce((sum, p) => sum + p.byteLength, 0);
-  const out = new Uint8Array(total);
-  let offset = 0;
+  const total = parts.reduce((sum, p) => sum + p.length, 0);
+  const out = new (parts[0].constructor as new (n: number) => T)(total);
+  let at = 0;
   for (const p of parts) {
-    out.set(new Uint8Array(p), offset);
-    offset += p.byteLength;
+    out.set(p, at);
+    at += p.length;
   }
-  return out.buffer;
+  return out;
 };

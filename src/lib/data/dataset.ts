@@ -1,7 +1,7 @@
-import { Cursor } from "$lib/core/binary";
 import { Names } from "$lib/core/strings";
+import { readTable, strings } from "$lib/core/table";
 
-import { dataUrl, fetchArray, fetchGz, fetchJson, setDataVersion } from "./fetch";
+import { dataUrl, fetchColumn, fetchGz, fetchJson, setDataVersion } from "./fetch";
 import type { Manifest } from "./manifest";
 import NamesWorker from "./names.worker?worker";
 import type { NamesRequest, NamesResponse } from "./names.worker";
@@ -86,48 +86,42 @@ const ask = <Request, Response>(
   });
 
 export const loadCore = async (manifest: Manifest): Promise<Core> => {
-  const n = manifest.nodes;
   const [positions, postCounts, categories] = await Promise.all([
-    fetchArray(manifest, "positions.bin.gz", "tag positions").then((b) => new Cursor(b).f32(n * 2)),
-    fetchArray(manifest, "post_counts.bin.gz", "post counts").then((b) => new Cursor(b).u32(n)),
-    fetchArray(manifest, "categories.bin.gz", "tag categories").then((b) => new Cursor(b).u8(n))
+    fetchColumn<Float32Array>(manifest, "positions.bin.gz", "position", "tag positions"),
+    fetchColumn<Uint32Array>(manifest, "post_counts.bin.gz", "post_counts", "post counts"),
+    fetchColumn<Uint8Array>(manifest, "categories.bin.gz", "categories", "tag categories")
   ]);
   return { manifest, positions, postCounts, categories };
 };
 
 export const loadBase = async (manifest: Manifest): Promise<EdgeRun> => {
-  const c = new Cursor(await fetchGz("base.bin.gz", manifest.files["base.bin.gz"], "first edges"));
-  return readEdgeRun(c, manifest.base_links);
+  return readEdgeRun(await fetchGz("base.bin.gz", manifest.files["base.bin.gz"], "first edges"));
 };
 
 export const loadNames = async (manifest: Manifest): Promise<Names> => {
   const count = manifest.nodes;
-  const buffer = await fetchArray(manifest, "names.bin.gz", "tags");
+  const buffer = await fetchGz("names.bin.gz", manifest.files["names.bin.gz"], "tags");
   beginStep("indexing tags");
   const request: NamesRequest = { count, buffer };
   const back = await ask<NamesRequest, NamesResponse>(new NamesWorker(), request, [buffer]);
   endStep("indexing tags");
-  const c = new Cursor(back.buffer);
-  return new Names(c.u32(count + 1), c.u8(c.remaining), back.table);
+  const { offsets, bytes } = strings(readTable(back.buffer), "name");
+  return new Names(offsets, bytes, back.table);
 };
 
-export const loadU16 = async (
+export const loadU16 = (
   manifest: Manifest,
   file: string,
-  n: number,
+  column: string,
   label: string
-): Promise<Uint16Array> => new Cursor(await fetchArray(manifest, file, label)).u16(n);
+): Promise<Uint16Array> => fetchColumn<Uint16Array>(manifest, file, column, label);
 
 export type Years = { rows: Uint16Array; over: Uint32Array };
 
 export const loadYears = async (manifest: Manifest): Promise<Years> => {
   const [rows, over] = await Promise.all([
-    fetchArray(manifest, "years.bin.gz").then((b) =>
-      new Cursor(b).u16(manifest.nodes * manifest.years.length)
-    ),
-    fetchArray(manifest, "years_over.bin.gz").then((b) =>
-      new Cursor(b).u32(manifest.years_over * 2)
-    )
+    fetchColumn<Uint16Array>(manifest, "years.bin.gz", "years"),
+    fetchColumn<Uint32Array>(manifest, "years_over.bin.gz", "years_over")
   ]);
   return { rows, over };
 };

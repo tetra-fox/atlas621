@@ -47,7 +47,7 @@
         loadCore(manifest),
         loadNames(manifest),
         loadVectors(manifest),
-        loadU16(manifest, "region.bin.gz", manifest.nodes, "islands"),
+        loadU16(manifest, "region.bin.gz", "region", "islands"),
         loadCommunities(manifest)
       ])
     )

@@ -1,4 +1,4 @@
-import { Cursor } from "$lib/core/binary";
+import { readTable, runs, values } from "$lib/core/table";
 
 import { loadNodeText } from "./dataset";
 import { fetchGz } from "./fetch";
@@ -6,7 +6,7 @@ import { WEIGHT_MAX, type Manifest } from "./manifest";
 
 export type PathGraph = {
   nodes: Uint32Array;
-  off: Uint32Array;
+  off: Int32Array;
   far: Uint32Array;
   weight: Uint16Array;
   row: Int32Array;
@@ -18,12 +18,10 @@ let graph: Promise<PathGraph> | null = null;
 
 export const loadPathGraph = (manifest: Manifest): Promise<PathGraph> => {
   graph ??= fetchGz("paths.bin.gz").then((buffer) => {
-    const c = new Cursor(buffer);
-    const [k, m] = c.u32(2);
-    const nodes = c.u32(k);
-    const off = c.u32(k + 1);
-    const far = c.u32(m);
-    const weight = c.u16(m);
+    const t = readTable(buffer);
+    const nodes = values<Uint32Array>(t, "node");
+    const { off, values: far } = runs<Uint32Array>(t, "far");
+    const weight = values<Uint16Array>(t, "weight");
     const row = new Int32Array(manifest.nodes).fill(-1);
     nodes.forEach((node, r) => {
       row[node] = r;
