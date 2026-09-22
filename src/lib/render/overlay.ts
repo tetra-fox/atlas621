@@ -171,9 +171,13 @@ export const drawOverlay = (
   // every sprite is rasterised into the atlas before any is read back out of it. interleaving
   // the two costs a surface sync per label where the driver cannot share the atlas canvas
   const flush = (): LabelHit[] => {
-    const fresh = queue.map((b) =>
-      sprite(atlas, b.key, b.text, b.font, b.fill, outline, LABEL_PAD)
-    );
+    const rasterise = () =>
+      queue.map((b) => sprite(atlas, b.key, b.text, b.font, b.fill, outline, LABEL_PAD));
+    const before = atlas.generation;
+    // a recycle part way through invalidates the sprites handed out before it; the frame's
+    // labels fit in an empty atlas, so rasterising once more is enough
+    const sprites = rasterise();
+    const fresh = atlas.generation === before ? sprites : rasterise();
     for (let i = 0; i < queue.length; i++) {
       const b = queue[i];
       const sp = fresh[i];

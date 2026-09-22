@@ -7,6 +7,8 @@ export type Atlas = {
   shelfY: number;
   shelfH: number;
   cursorX: number;
+  // bumped on every recycle so a caller can tell its sprites went stale
+  generation: number;
 };
 type Box = { width: number; height: number };
 const ATLAS_SIZE = 2048;
@@ -41,7 +43,7 @@ export const atlasFor = (dpr: number): Atlas => {
   canvas.height = ATLAS_SIZE;
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("atlas: no 2d context");
-  atlas = { canvas, ctx, dpr, sprites: new Map(), shelfY: 0, shelfH: 0, cursorX: 0 };
+  atlas = { canvas, ctx, dpr, sprites: new Map(), shelfY: 0, shelfH: 0, cursorX: 0, generation: 0 };
   atlases.set(dpr, atlas);
   return atlas;
 };
@@ -65,10 +67,11 @@ export const sprite = (
     atlas.shelfH = 0;
     atlas.cursorX = 0;
   }
-  // recycling invalidates earlier sprites, so the frame's blits are held until all are made
+  // recycling invalidates every sprite handed out so far; callers watch generation and rebuild
   if (atlas.shelfY + Math.max(h, atlas.shelfH) > ATLAS_SIZE) {
     atlas.ctx.clearRect(0, 0, ATLAS_SIZE, ATLAS_SIZE);
     atlas.sprites.clear();
+    atlas.generation++;
     atlas.shelfY = 0;
     atlas.shelfH = 0;
     atlas.cursorX = 0;
