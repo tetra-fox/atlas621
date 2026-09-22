@@ -10,12 +10,14 @@ mod territories;
 mod text;
 
 use std::path::PathBuf;
+use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result};
 use atlas_core::{communities, edges, embed, hex, layout, tsne};
 use clap::{Args, Parser, Subcommand};
 
 use store::Store;
+use tracing::{debug, error, info};
 
 #[derive(Parser)]
 #[command(about = "turns the e621 db exports into the atlas621 map dataset")]
@@ -533,7 +535,7 @@ fn text(ctx: &Ctx, args: &TextArgs) -> Result<()> {
     let edges_meta: edges::EdgesMeta = ctx.store.load_json("edges.meta")?;
     let shards = search::build(&tags, &out.aliases, &tail, edges_meta.tail_neighbors);
     let entries: usize = shards.values().map(Vec::len).sum();
-    log::info!("{} search shards, {entries} entries", shards.len());
+    tracing::info!("{} search shards, {entries} entries", shards.len());
     ctx.store
         .save_shards("search", shards.iter().map(|(k, v)| (k.clone(), v)))
 }
@@ -591,9 +593,60 @@ fn emit(ctx: &Ctx, args: &EmitArgs) -> Result<()> {
     )
 }
 
+// humantime keeps every unit it is given, so round first or a ci line carries microseconds
+fn human(d: Duration) -> String {
+    let rounded = if d.as_secs() > 0 {
+        Duration::from_secs(d.as_secs())
+    } else {
+        Duration::from_millis(d.as_millis() as u64)
+    };
+    humantime::format_duration(rounded).to_string()
+}
+
+#[derive(Default)]
+struct Timings(Vec<(&'static str, Duration)>);
+
+impl Timings {
+    // every stage runs inside a span named after it, so a ci log line says which stage wrote it
+    fn stage<T>(&mut self, name: &'static str, run: impl FnOnce() -> Result<T>) -> Result<T> {
+        let span = tracing::info_span!("stage", name);
+        let _enter = span.enter();
+        let started = Instant::now();
+        debug!("started");
+        let out = run();
+        let took = started.elapsed();
+        match &out {
+            Ok(_) => info!("{name} completed in {}", human(took)),
+            Err(e) => error!("{name} failed after {}: {e:#}", human(took)),
+        }
+        self.0.push((name, took));
+        out
+    }
+
+    fn digest(&self) {
+        let total: Duration = self.0.iter().map(|(_, d)| *d).sum();
+        let width = self.0.iter().map(|(n, _)| n.len()).max().unwrap_or(0);
+        let mut lines = String::from("stage summary");
+        for (name, took) in &self.0 {
+            let share = took.as_secs_f64() / total.as_secs_f64().max(1e-9) * 100.0;
+            lines.push_str(&format!(
+                "\n  {name:<width$}  {:>8}  {share:4.0}%",
+                human(*took)
+            ));
+        }
+        lines.push_str(&format!("\n  {:<width$}  {:>8}", "total", human(total)));
+        info!("{lines}");
+    }
+}
+
 fn main() -> Result<()> {
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
-        .format_timestamp_millis()
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
+        )
+        .with_target(true)
+        .with_ansi(std::io::IsTerminal::is_terminal(&std::io::stderr()))
         .init();
     let cli = Cli::parse();
     std::fs::create_dir_all(&cli.cache_dir).context("create cache dir")?;
@@ -603,26 +656,30 @@ fn main() -> Result<()> {
         offline: cli.offline,
         store: Store::new(&cli.work_dir),
     };
-    match &cli.cmd {
-        Cmd::Fetch => fetch(&ctx),
-        Cmd::Count(a) => count(&ctx, a),
-        Cmd::Edges(a) => edges(&ctx, a),
-        Cmd::Embed(a) => embed(&ctx, a),
-        Cmd::Communities(a) => communities(&ctx, a),
-        Cmd::Layout(a) => layout(&ctx, a),
-        Cmd::Territories(a) => territories(&ctx, a),
-        Cmd::Text(a) => text(&ctx, a),
-        Cmd::Emit(a) => emit(&ctx, a),
-        Cmd::All(a) => {
-            fetch(&ctx)?;
-            count(&ctx, &a.count)?;
-            edges(&ctx, &a.edges)?;
-            embed(&ctx, &a.embed)?;
-            communities(&ctx, &a.communities)?;
-            layout(&ctx, &a.layout)?;
-            territories(&ctx, &a.territories)?;
-            text(&ctx, &a.text)?;
-            emit(&ctx, &a.emit)
-        }
-    }
+    let mut t = Timings::default();
+    let out = match &cli.cmd {
+        Cmd::Fetch => t.stage("fetch", || fetch(&ctx)),
+        Cmd::Count(a) => t.stage("count", || count(&ctx, a)),
+        Cmd::Edges(a) => t.stage("edges", || edges(&ctx, a)),
+        Cmd::Embed(a) => t.stage("embed", || embed(&ctx, a)),
+        Cmd::Communities(a) => t.stage("communities", || communities(&ctx, a)),
+        Cmd::Layout(a) => t.stage("layout", || layout(&ctx, a)),
+        Cmd::Territories(a) => t.stage("territories", || territories(&ctx, a)),
+        Cmd::Text(a) => t.stage("text", || text(&ctx, a)),
+        Cmd::Emit(a) => t.stage("emit", || emit(&ctx, a)),
+        Cmd::All(a) => (|| {
+            t.stage("fetch", || fetch(&ctx))?;
+            t.stage("count", || count(&ctx, &a.count))?;
+            t.stage("edges", || edges(&ctx, &a.edges))?;
+            t.stage("embed", || embed(&ctx, &a.embed))?;
+            t.stage("communities", || communities(&ctx, &a.communities))?;
+            t.stage("layout", || layout(&ctx, &a.layout))?;
+            t.stage("territories", || territories(&ctx, &a.territories))?;
+            t.stage("text", || text(&ctx, &a.text))?;
+            t.stage("emit", || emit(&ctx, &a.emit))
+        })(),
+    };
+    t.digest();
+    out
 }
+

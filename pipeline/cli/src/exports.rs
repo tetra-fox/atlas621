@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
 use flate2::bufread::MultiGzDecoder;
-use log::info;
+use tracing::info;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 

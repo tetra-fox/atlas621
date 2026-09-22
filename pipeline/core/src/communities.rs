@@ -2,7 +2,7 @@ use std::time::Instant;
 
 use anyhow::{Context, Result};
 use leiden_rs::{GraphDataBuilder, Leiden, LeidenConfig};
-use log::info;
+use tracing::{debug, info, trace};
 use rand::prelude::*;
 use rustc_hash::FxHashMap;
 
@@ -77,6 +77,7 @@ fn absorb_small(membership: &mut [usize], edges: &Edges, min_size: usize) -> usi
             }
         }
         moved += changed;
+        trace!(changed, min_size, "absorbed communities below the size floor");
         if changed == 0 {
             break;
         }
@@ -105,7 +106,7 @@ fn local_moving_sweeps(
     let mut weight_to = vec![0f64; k];
     let mut touched: Vec<usize> = Vec::new();
     let mut moves = 0;
-    for _ in 0..sweeps {
+    for sweep in 0..sweeps {
         order.shuffle(&mut rng);
         let mut moved_this_sweep = 0;
         for &v in &order {
@@ -149,6 +150,7 @@ fn local_moving_sweeps(
             touched.clear();
         }
         moves += moved_this_sweep;
+        debug!(sweep = sweep + 1, of = sweeps, moved = moved_this_sweep, "local moving sweep");
         if moved_this_sweep == 0 {
             break;
         }
@@ -221,6 +223,14 @@ fn attach_tail(
 
 pub fn detect(edges: &Edges, n: usize, post_counts: &[u32], params: &CommunityParams) -> Result<Vec<u32>> {
     let t0 = Instant::now();
+    debug!(
+        resolution = params.region_resolution,
+        min_region = params.min_region,
+        core_floor = params.core_floor,
+        refine_sweeps = params.refine_sweeps,
+        seed = params.seed,
+        "detecting communities"
+    );
     let core: Vec<bool> = post_counts
         .iter()
         .map(|&p| p >= params.core_floor)

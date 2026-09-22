@@ -1,6 +1,6 @@
 use std::time::Instant;
 
-use log::info;
+use tracing::info;
 use nalgebra::DMatrix;
 use rand::prelude::*;
 use rayon::prelude::*;

@@ -1,4 +1,4 @@
-use log::debug;
+use tracing::debug;
 
 pub const NONE: u32 = u32::MAX;
 const MAX_DEPTH: u32 = 48;

@@ -1,6 +1,6 @@
 use std::time::Instant;
 
-use log::{debug, info};
+use tracing::{debug, info};
 use rand::prelude::*;
 use rayon::prelude::*;
 

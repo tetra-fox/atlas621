@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use log::info;
+use tracing::{debug, info};
 
 use atlas_core::edges::Edges;
 
@@ -80,6 +80,12 @@ impl Fit {
                 best[r] = best[r].max(f1);
             }
         }
+        debug!(
+            candidates = candidates.len(),
+            communities = k,
+            min_fit = params.min_fit,
+            "scored name candidates"
+        );
         Fit {
             candidates,
             k,

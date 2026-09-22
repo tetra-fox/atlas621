@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use log::info;
+use tracing::info;
 use rustc_hash::FxHashMap;
 
 const ARROW_MAGIC: &[u8] = b"ARROW1";

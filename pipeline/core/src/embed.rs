@@ -1,6 +1,6 @@
 use std::time::Instant;
 
-use log::info;
+use tracing::{debug, info, trace};
 use nalgebra::DMatrix;
 use rand::prelude::*;
 use rayon::prelude::*;
@@ -111,17 +111,26 @@ fn randomized_svd(
 ) -> (Vec<f32>, Vec<f32>, Vec<f64>) {
     let t0 = Instant::now();
     let w = params.dim + params.oversample;
+    debug!(
+        dim = params.dim,
+        oversample = params.oversample,
+        power_iterations = params.power_iterations,
+        seed = params.seed,
+        rows = n,
+        "randomized svd starting"
+    );
     let mut rng = StdRng::seed_from_u64(params.seed);
     let omega: Vec<f32> = (0..n * w).map(|_| normal(&mut rng, 1.0) as f32).collect();
     let mut q = sparse_times(a, &omega, w);
     drop(omega);
     orthonormalize(&mut q, w);
     // a is symmetric, so one power iteration of a*a' is two multiplies by a
-    for _ in 0..params.power_iterations {
+    for step in 0..params.power_iterations {
         for _ in 0..2 {
             q = sparse_times(a, &q, w);
             orthonormalize(&mut q, w);
         }
+        debug!(step = step + 1, of = params.power_iterations, elapsed = ?t0.elapsed(), "power iteration");
     }
     let aq = sparse_times(a, &q, w);
     let c = gram(&aq, w);
@@ -280,6 +289,7 @@ pub fn embed(
             (v > 0.0).then_some((row[a as usize], row[b as usize], v as f32))
         })
         .collect();
+    trace!(core = core.len(), tail = tail.len(), "split tags by the core floor");
     let matrix = Csr::symmetric(core.len(), entries.iter().copied());
     info!(
         "ppmi over {} core tags (>= {} posts): {} positive pairs of {} with count >= {}, {:.0?}",

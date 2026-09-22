@@ -1,6 +1,6 @@
 use std::time::Instant;
 
-use log::info;
+use tracing::info;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 

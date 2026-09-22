@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result, bail};
 use flate2::Compression;
 use flate2::write::GzEncoder;
-use log::info;
+use tracing::{debug, info};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 
@@ -110,6 +110,7 @@ impl Emitter {
         if size > MAX_FILE {
             bail!("{name} is {size} bytes, over the {MAX_FILE} byte static asset limit; split it");
         }
+        debug!(file = name, bytes = size, "wrote");
         self.files.insert(name.to_string(), size);
         Ok(())
     }
@@ -260,7 +261,7 @@ fn named(
             .filter(|&i| (i as usize) < membership.len())
         {
             Some(i) => out[membership[i as usize] as usize].name = name.clone(),
-            None => log::warn!("override member {member} is not a node, ignored"),
+            None => tracing::warn!("override member {member} is not a node, ignored"),
         }
     }
     out

@@ -2,7 +2,7 @@ use std::time::Instant;
 
 use anyhow::Result;
 use geo::{Area, Coord, LineString, Polygon, unary_union};
-use log::info;
+use tracing::{debug, info, trace};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 
@@ -178,6 +178,7 @@ fn basins(occupied: &[(i32, i32)], counts: &[u32], rings: usize, min_nodes: usiz
                 merged += 1;
             }
         }
+        trace!(merged, "basin merge pass");
         if merged == 0 {
             break;
         }
@@ -197,6 +198,13 @@ fn basins(occupied: &[(i32, i32)], counts: &[u32], rings: usize, min_nodes: usiz
 
 pub fn cut(pos: &[[f32; 2]], params: &CutParams) -> Result<Cut> {
     let t0 = Instant::now();
+    debug!(
+        hex_cols = params.hex_cols,
+        rings = params.rings,
+        min_nodes = params.min_nodes,
+        points = pos.len(),
+        "cutting territories"
+    );
     let (mut lo, mut hi) = (f64::MAX, f64::MIN);
     for p in pos {
         lo = lo.min(p[0] as f64);

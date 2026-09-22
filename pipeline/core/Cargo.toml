@@ -14,10 +14,10 @@ arrow = { version = "60.0.0", default-features = false, features = ["ipc"] }
 clap = { version = "4.6.7", features = ["derive"], optional = true }
 geo = "0.33.1"
 leiden-rs = { version = "0.8.1", default-features = false, features = ["rayon"] }
-log = "0.4.34"
 nalgebra = { version = "0.34", default-features = false, features = ["std"] }
 polylabel = "3.3.0"
 rand = "0.10.2"
 rayon = "1.12.0"
 rustc-hash = "2.1.3"
 serde = { version = "1.0.229", features = ["derive"] }
+tracing = "0.1.44"

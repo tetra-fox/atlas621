@@ -4,7 +4,7 @@ use std::time::Instant;
 
 use anyhow::Result;
 use jiff::civil;
-use log::{info, warn};
+use tracing::{debug, info, warn};
 use regex::Regex;
 use rustc_hash::{FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
@@ -201,6 +201,12 @@ pub fn build(
     params: &TextParams,
 ) -> Result<TextOutput> {
     let t0 = Instant::now();
+    debug!(
+        lump_threshold = params.lump_threshold,
+        excerpt_chars = params.excerpt_chars,
+        shard_size = params.shard_size,
+        "building text shards"
+    );
     let n_nodes = tags.n_nodes;
     let mut shards: BTreeMap<usize, BTreeMap<u32, NodeText>> = BTreeMap::new();
     let shard_size = params.shard_size;

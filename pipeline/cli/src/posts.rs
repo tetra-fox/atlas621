@@ -4,7 +4,7 @@ use std::time::Instant;
 
 use anyhow::{Context, Result, anyhow, bail};
 use crossbeam_channel::{Receiver, bounded};
-use log::{info, warn};
+use tracing::{info, warn};
 use rustc_hash::FxHashMap;
 
 use atlas_core::pairs::Pairs;
