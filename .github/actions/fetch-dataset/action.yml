@@ -1,0 +1,57 @@
+name: fetch dataset
+description: unpack the dataset a rebuild left behind, from a given run or from the newest one the repo still holds
+
+inputs:
+  run:
+    description: the run whose dataset artifact to take, or the newest live one when empty
+    default: ""
+  path:
+    description: where to unpack it
+    default: static/data
+  required:
+    description: fail when there is no dataset artifact to take
+    default: "false"
+
+outputs:
+  found:
+    description: whether a dataset was unpacked
+    value: ${{ steps.pick.outputs.run != '' }}
+
+runs:
+  using: composite
+  steps:
+    - id: pick
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        RUN: ${{ inputs.run }}
+        REQUIRED: ${{ inputs.required }}
+      run: |
+        if [ -z "$RUN" ]; then
+          RUN=$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?name=dataset&per_page=100" \
+            --jq '[.artifacts[] | select(.expired == false)] | sort_by(.created_at) | reverse | .[0].workflow_run.id // empty')
+        fi
+        if [ -z "$RUN" ] && [ "$REQUIRED" = "true" ]; then
+          echo "no dataset artifact in this repo; run the rebuild workflow once to make the first one" >&2
+          exit 1
+        fi
+        echo "run=$RUN" >> "$GITHUB_OUTPUT"
+
+    - if: steps.pick.outputs.run != ''
+      uses: actions/download-artifact@v8
+      with:
+        name: dataset
+        path: ${{ runner.temp }}/dataset
+        run-id: ${{ steps.pick.outputs.run }}
+        github-token: ${{ github.token }}
+
+    - if: steps.pick.outputs.run != ''
+      shell: bash
+      env:
+        DEST: ${{ inputs.path }}
+        TAR: ${{ runner.temp }}/dataset/dataset.tar
+      run: |
+        rm -rf "$DEST"
+        mkdir -p "$DEST"
+        tar -xf "$TAR" -C "$DEST" --strip-components=1
+        rm "$TAR"

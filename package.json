@@ -11,12 +11,13 @@
     "prepare": "svelte-kit sync || echo ''",
     "check": "svelte-kit sync && svelte-check --tsgo --tsconfig ./tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsgo --tsconfig ./tsconfig.json --watch",
+    "check:dataset": "node scripts/check-dataset.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "format": "oxfmt .",
     "lint": "oxfmt --check . && oxlint",
     "fmt": "pnpm format",
-    "deploy": "pnpm run build && wrangler deploy"
+    "deploy": "pnpm run build && pnpm run check:dataset && wrangler deploy"
   },
   "devDependencies": {
     "@sveltejs/adapter-static": "^3.0.10",

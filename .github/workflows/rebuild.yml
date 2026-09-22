@@ -5,45 +5,73 @@ on:
     - cron: "17 6 2 * *"
   workflow_dispatch:
 
-concurrency:
-  group: rebuild
-  cancel-in-progress: false
+permissions:
+  contents: read
+  actions: read
 
 jobs:
-  rebuild:
+  dataset:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
-    env:
-      SITE_URL: https://atlas621.net
+    timeout-minutes: 350
+    concurrency:
+      group: rebuild
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: pipeline
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v7
+
+      - name: take the last dataset as the layout seed
+        id: previous
+        uses: ./.github/actions/fetch-dataset
         with:
-          node-version: 24
-          cache: pnpm
+          path: previous
+
+      - name: make room for the intermediates
+        run: |
+          df -h / /mnt && free -h
+          # the exports and the stage outputs come to tens of gb, which only the temp disk has
+          sudo mkdir -p /mnt/atlas
+          sudo chown "$(id -u):$(id -g)" /mnt/atlas
+          # count holds the pair table in memory, past what a 16 gb runner has, so give it swap
+          # rather than let it be killed partway through
+          sudo fallocate -l 32G /mnt/atlas.swap
+          sudo chmod 600 /mnt/atlas.swap
+          sudo mkswap /mnt/atlas.swap
+          sudo swapon /mnt/atlas.swap
+          swapon --show
 
       - run: cargo build --release --manifest-path pipeline/Cargo.toml
 
-      - name: run pipeline
+      - name: run the pipeline
         run: |
-          previous=()
-          if curl -fsSIL "$SITE_URL/data/manifest.json" > /dev/null; then
-            previous=(--previous "$SITE_URL/data")
+          seed=()
+          if [ "${{ steps.previous.outputs.found }}" = "true" ]; then
+            seed=(--previous previous)
           else
-            echo "no previous deploy reachable, cold start"
+            echo "no previous dataset, cold start"
           fi
-          ./pipeline/target/release/atlas621 all "${previous[@]}"
+          ./pipeline/target/release/atlas621 \
+            --cache-dir /mnt/atlas/exports \
+            --work-dir /mnt/atlas/work \
+            all "${seed[@]}"
 
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm build
+      - name: pack the dataset
+        run: tar -cf dataset.tar -C static data
 
-      - uses: cloudflare/wrangler-action@v4
+      - uses: actions/upload-artifact@v7
         with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy
+          name: dataset
+          path: dataset.tar
+          compression-level: 0
+          retention-days: 90
+          if-no-files-found: error
+
+  deploy:
+    needs: dataset
+    uses: ./.github/workflows/deploy.yml
+    with:
+      dataset-run: ${{ github.run_id }}
+    secrets: inherit

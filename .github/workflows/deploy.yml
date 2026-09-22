@@ -1,0 +1,52 @@
+name: deploy
+
+on:
+  workflow_call:
+    inputs:
+      dataset-run:
+        description: the run whose dataset artifact to ship, or the newest live one when empty
+        type: string
+        default: ""
+  workflow_dispatch:
+    inputs:
+      dataset-run:
+        description: the run whose dataset artifact to ship, or the newest live one when empty
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    # a push deploy and a rebuild deploy both write the same worker, so they queue rather than race
+    concurrency:
+      group: deploy
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v7
+
+      # every deployment carries the whole dataset, so one that builds without it takes the data
+      # off the live site
+      - uses: ./.github/actions/fetch-dataset
+        with:
+          run: ${{ inputs.dataset-run }}
+          required: "true"
+
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm run check:dataset
+
+      - uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy
