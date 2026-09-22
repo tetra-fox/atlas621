@@ -35,31 +35,32 @@ pub struct Bur {
 #[derive(Serialize, Deserialize)]
 pub struct NodeImplication(pub u32, pub u32, pub Option<u16>, pub bool);
 
-// one field name per letter here and in NodeText: these shards are json the browser downloads
 #[derive(Serialize, Deserialize, Default)]
 pub struct Event {
-    pub d: String,
-    pub k: String,
-    pub o: String,
-    pub s: String,
+    pub date: String,
+    pub kind: String,
+    // the tag on the other side of the alias or implication
+    pub other: String,
+    pub source: String,
+    // the date came from a migration day rather than the change itself
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
-    pub a: bool,
+    pub approx: bool,
 }
 
 #[derive(Serialize, Deserialize, Default)]
 pub struct NodeText {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub w: Option<String>,
+    pub wiki: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub l: Vec<u32>,
+    pub links: Vec<u32>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub a: Vec<String>,
+    pub aliases: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub c: Vec<String>,
+    pub children: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub p: Vec<String>,
+    pub parents: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub h: Vec<Event>,
+    pub history: Vec<Event>,
 }
 
 pub struct TextOutput {
@@ -280,12 +281,12 @@ pub fn build(
                 if idx as usize >= n_nodes || (me == other) {
                     continue;
                 }
-                text_for(&mut shards, shard_size, idx).h.push(Event {
-                    d: bur.date.clone(),
-                    k: op[0].clone(),
-                    o: other.clone(),
-                    s: format!("bur:{}", bur.id),
-                    a: false,
+                text_for(&mut shards, shard_size, idx).history.push(Event {
+                    date: bur.date.clone(),
+                    kind: op[0].clone(),
+                    other: other.clone(),
+                    source: format!("bur:{}", bur.id),
+                    approx: false,
                 });
             }
         }
@@ -315,19 +316,19 @@ pub fn build(
             aliases.push((rec[c_from].to_string(), target));
             if (target as usize) < n_nodes {
                 let t = text_for(&mut shards, shard_size, target);
-                t.a.push(rec[c_from].to_string());
+                t.aliases.push(rec[c_from].to_string());
                 if !op_date.contains_key(&(
                     "alias".to_string(),
                     rec[c_from].to_string(),
                     rec[c_to].to_string(),
                 )) && !rec[c_created].is_empty()
                 {
-                    t.h.push(Event {
-                        d: date_part(&rec[c_created]).to_string(),
-                        k: "alias".into(),
-                        o: rec[c_from].to_string(),
-                        s: "created_at".into(),
-                        a: false,
+                    t.history.push(Event {
+                        date: date_part(&rec[c_created]).to_string(),
+                        kind: "alias".into(),
+                        other: rec[c_from].to_string(),
+                        source: "created_at".into(),
+                        approx: false,
                     });
                 }
             }
@@ -380,12 +381,12 @@ pub fn build(
             if let Some(ci) = ci
                 && (ci as usize) < n_nodes
             {
-                text_for(&mut shards, shard_size, ci).p.push(parent.clone());
+                text_for(&mut shards, shard_size, ci).parents.push(parent.clone());
             }
             if let Some(pi) = pi
                 && (pi as usize) < n_nodes
             {
-                text_for(&mut shards, shard_size, pi).c.push(child.clone());
+                text_for(&mut shards, shard_size, pi).children.push(child.clone());
             }
             let bur = op_date.get(&("implicate".to_string(), child.clone(), parent.clone()));
             let (date, approx, source) = match bur {
@@ -406,23 +407,23 @@ pub fn build(
                 if let Some(ci) = ci
                     && (ci as usize) < n_nodes
                 {
-                    text_for(&mut shards, shard_size, ci).h.push(Event {
-                        d: d.clone(),
-                        k: "implicate".into(),
-                        o: parent.clone(),
-                        s: source.clone(),
-                        a: approx,
+                    text_for(&mut shards, shard_size, ci).history.push(Event {
+                        date: d.clone(),
+                        kind: "implicate".into(),
+                        other: parent.clone(),
+                        source: source.clone(),
+                        approx,
                     });
                 }
                 if let Some(pi) = pi
                     && (pi as usize) < n_nodes
                 {
-                    text_for(&mut shards, shard_size, pi).h.push(Event {
-                        d: d.clone(),
-                        k: "implicate".into(),
-                        o: child.clone(),
-                        s: source.clone(),
-                        a: approx,
+                    text_for(&mut shards, shard_size, pi).history.push(Event {
+                        date: d.clone(),
+                        kind: "implicate".into(),
+                        other: child.clone(),
+                        source: source.clone(),
+                        approx,
                     });
                 }
             }
@@ -467,8 +468,8 @@ pub fn build(
             pages += 1;
             let body = &rec[c_body];
             let t = text_for(&mut shards, shard_size, idx);
-            t.w = dtext.excerpt(body, params.excerpt_chars);
-            with_excerpt += t.w.is_some() as usize;
+            t.wiki = dtext.excerpt(body, params.excerpt_chars);
+            with_excerpt += t.wiki.is_some() as usize;
             let mut seen = FxHashSet::default();
             for link in dtext.links(body) {
                 if let Some(li) = tags.index_of(&link)
@@ -476,10 +477,10 @@ pub fn build(
                     && li != idx
                     && seen.insert(li)
                 {
-                    t.l.push(li);
+                    t.links.push(li);
                 }
             }
-            links += t.l.len();
+            links += t.links.len();
         }
         info!(
             "{pages} wiki pages belong to nodes, {with_excerpt} yield an excerpt, {links} see-also links, {:.0?}",
@@ -489,8 +490,8 @@ pub fn build(
 
     for shard in shards.values_mut() {
         for t in shard.values_mut() {
-            t.h.sort_by(|x, y| x.d.cmp(&y.d).then(x.k.cmp(&y.k)).then(x.o.cmp(&y.o)));
-            t.h.dedup_by(|x, y| x.d == y.d && x.k == y.k && x.o == y.o);
+            t.history.sort_by(|x, y| x.date.cmp(&y.date).then(x.kind.cmp(&y.kind)).then(x.other.cmp(&y.other)));
+            t.history.dedup_by(|x, y| x.date == y.date && x.kind == y.kind && x.other == y.other);
         }
     }
     if unknown_lines > 2000 {

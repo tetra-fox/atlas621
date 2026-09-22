@@ -87,7 +87,7 @@ export const findPath = async (
   const g = await loadPathGraph(manifest);
   const entries = async (node: number): Promise<[number, number][]> => {
     if (g.row[node] >= 0) return [[node, WEIGHT_MAX]];
-    const e = (await loadNodeText(manifest, node))?.e ?? [];
+    const e = (await loadNodeText(manifest, node))?.edges ?? [];
     const out: [number, number][] = [];
     for (let k = 0; k + 2 < e.length; k += 3) if (g.row[e[k]] >= 0) out.push([e[k], e[k + 1]]);
     return out;

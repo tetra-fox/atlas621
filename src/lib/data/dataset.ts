@@ -29,19 +29,29 @@ export type Communities = {
 
 export type Implication = [child: number, parent: number, day: number | null, approx: boolean];
 
-export type HistoryEvent = { d: string; k: string; o: string; s: string; a?: boolean };
+export type HistoryEvent = {
+  date: string;
+  kind: string;
+  // the tag on the other side of the alias or implication
+  other: string;
+  source: string;
+  // the date came from a migration day rather than the change itself
+  approx?: boolean;
+};
 
 export type NodeText = {
-  w?: string;
-  l?: number[];
-  a?: string[];
-  c?: string[];
-  p?: string[];
-  h?: HistoryEvent[];
-  r?: [number, number, number];
-  g?: number;
-  e?: number[];
-  s?: number[];
+  wiki?: string;
+  links?: number[];
+  aliases?: string[];
+  children?: string[];
+  parents?: string[];
+  history?: HistoryEvent[];
+  ratings?: [number, number, number];
+  region?: number;
+  // flat triples of node, weight, count
+  edges?: number[];
+  // flat pairs of node, weight
+  similar?: number[];
 };
 
 export type SearchEntry = {

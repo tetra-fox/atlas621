@@ -699,21 +699,21 @@ pub fn write(out_dir: &Path, store: &Store, inputs: EmitInputs) -> Result<()> {
         inputs.store_shard_size,
         inputs.text_shard_bytes,
         |i, entry| {
-            entry.insert("r".into(), json!(&inputs.stats.node_rating[i * 3..i * 3 + 3]));
-            entry.insert("g".into(), json!(inputs.region[i]));
+            entry.insert("ratings".into(), json!(&inputs.stats.node_rating[i * 3..i * 3 + 3]));
+            entry.insert("region".into(), json!(inputs.region[i]));
             if !appears[i].is_empty() {
                 let flat: Vec<u32> = appears[i]
                     .iter()
                     .flat_map(|&(other, w, c)| [other, u32::from(w), c])
                     .collect();
-                entry.insert("e".into(), json!(flat));
+                entry.insert("edges".into(), json!(flat));
             }
             if !similar[i].is_empty() {
                 let flat: Vec<u32> = similar[i]
                     .iter()
                     .flat_map(|&(other, w)| [other, u32::from(w)])
                     .collect();
-                entry.insert("s".into(), json!(flat));
+                entry.insert("similar".into(), json!(flat));
             }
         },
     )?;

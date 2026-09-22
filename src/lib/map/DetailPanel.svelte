@@ -42,12 +42,12 @@
   const span = $derived(core.manifest.years.length);
   const yearly = $derived(years ? yearRow(years, span, node) : null);
   let text = $state.raw<{ node: number; t: NodeText | undefined; failed: boolean } | null>(null);
-  const split = $derived(text?.t?.r ?? null);
+  const split = $derived(text?.t?.ratings ?? null);
   const regionName = $derived(
-    text?.t?.g === undefined ? null : (communities.regions[text.t.g]?.name ?? null)
+    text?.t?.region === undefined ? null : (communities.regions[text.t.region]?.name ?? null)
   );
   const neighbors = $derived.by(() => {
-    const e = text?.t?.e;
+    const e = text?.t?.edges;
     if (!e) return [];
     const out: { node: number; weight: number; count: number }[] = [];
     for (let k = 0; k + 2 < e.length; k += 3)
@@ -55,7 +55,7 @@
     return out;
   });
   const similar = $derived.by(() => {
-    const s = text?.t?.s;
+    const s = text?.t?.similar;
     if (!s) return [];
     const out: { node: number; weight: number }[] = [];
     for (let k = 0; k + 1 < s.length; k += 2)
@@ -262,57 +262,59 @@
       {#if regionName}
         <p class="text-xs text-muted">island: {regionName}</p>
       {/if}
-      {#if t?.w}
-        <p class="rounded-sm bg-section p-2 text-xs">{t.w}</p>
+      {#if t?.wiki}
+        <p class="rounded-sm bg-section p-2 text-xs">{t.wiki}</p>
       {/if}
-      {#if t?.p?.length || t?.c?.length}
+      {#if t?.parents?.length || t?.children?.length}
         <section class="text-xs">
-          {#if t.p?.length}
+          {#if t.parents?.length}
             <p>
               <span class="text-muted">implies</span>
-              {#each t.p as tag (tag)}{@render tagLink(tag)}{/each}
+              {#each t.parents as tag (tag)}{@render tagLink(tag)}{/each}
             </p>
           {/if}
-          {#if t.c?.length}
+          {#if t.children?.length}
             <p class="mt-1">
-              <span class="text-muted">implied by ({t.c.length})</span>
-              {#each impliedAll ? t.c : t.c.slice(0, 30) as tag (tag)}{@render tagLink(tag)}{/each}
-              {#if t.c.length > 30}
+              <span class="text-muted">implied by ({t.children.length})</span>
+              {#each impliedAll ? t.children : t.children.slice(0, 30) as tag (tag)}{@render tagLink(
+                  tag
+                )}{/each}
+              {#if t.children.length > 30}
                 <button
                   type="button"
                   class="ml-1 text-muted hover:text-link-hover"
                   onclick={() => (impliedAll = !impliedAll)}
-                  >{impliedAll ? "fewer" : `and ${t.c.length - 30} more`}</button>
+                  >{impliedAll ? "fewer" : `and ${t.children.length - 30} more`}</button>
               {/if}
             </p>
           {/if}
         </section>
       {/if}
-      {#if t?.a?.length}
-        <p class="text-xs"><span class="text-muted">also known as</span> {t.a.join(", ")}</p>
+      {#if t?.aliases?.length}
+        <p class="text-xs"><span class="text-muted">also known as</span> {t.aliases.join(", ")}</p>
       {/if}
-      {#if t?.l?.length}
+      {#if t?.links?.length}
         <p class="text-xs">
           <span class="text-muted">see also</span>
-          {#each t.l.slice(0, 20) as idx (idx)}{@render tagLink(names.at(idx))}{/each}
+          {#each t.links.slice(0, 20) as idx (idx)}{@render tagLink(names.at(idx))}{/each}
         </p>
       {/if}
-      {#if t?.h?.length}
+      {#if t?.history?.length}
         <Collapsible.Root bind:open={historyOpen} class="text-xs">
           <Collapsible.Trigger class="font-bold hover:text-link-hover">
             <span
               class={["inline-block align-[-2px] transition-transform", historyOpen && "rotate-90"]}
               ><ChevronRight class="size-3.5" /></span>
-            history ({t.h.length})
+            history ({t.history.length})
           </Collapsible.Trigger>
           <Collapsible.Content>
             <ul class="mt-1 space-y-0.5">
-              {#each t.h.slice().reverse() as ev, i (i)}
+              {#each t.history.slice().reverse() as ev, i (i)}
                 <li class="flex gap-2">
-                  <span class="text-muted tabular-nums">{ev.d}</span>
-                  <span>{ev.k}</span>
-                  <span class="truncate">{@render tagLink(ev.o)}</span>
-                  {#if ev.a}<span class="text-muted" title="date comes from a bulk migration"
+                  <span class="text-muted tabular-nums">{ev.date}</span>
+                  <span>{ev.kind}</span>
+                  <span class="truncate">{@render tagLink(ev.other)}</span>
+                  {#if ev.approx}<span class="text-muted" title="date comes from a bulk migration"
                       >~</span
                     >{/if}
                 </li>
