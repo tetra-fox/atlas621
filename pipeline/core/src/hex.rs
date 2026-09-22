@@ -17,7 +17,6 @@ pub struct CutParams {
 #[ts(export, export_to = "../../../src/lib/data/generated.ts")]
 pub struct Feature {
     pub community: u32,
-    pub label: bool,
     pub anchor: [f32; 2],
     pub cells: usize,
     pub hexes: Vec<i32>,
@@ -281,7 +280,6 @@ pub fn cut(pos: &[[f32; 2]], params: &CutParams) -> Result<Cut> {
             );
         features.push(Feature {
             community: b as u32,
-            label: true,
             anchor,
             cells: cells.len(),
             hexes: cells.iter().flat_map(|&(q, r)| [q, r]).collect(),

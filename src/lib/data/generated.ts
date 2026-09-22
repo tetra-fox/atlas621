@@ -6,7 +6,7 @@ export type CommunitiesOut = { regions: Array<NamedCommunity>, continents: Array
 
 export type Event = { date: string, kind: string, other: string, source: string, approx?: boolean, };
 
-export type Feature = { community: number, label: boolean, anchor: [number, number], cells: number, hexes: Array<number>, };
+export type Feature = { community: number, anchor: [number, number], cells: number, hexes: Array<number>, };
 
 export type LevelOut = { hex_size: number, origin: [number, number], features: Array<Feature>, };
 

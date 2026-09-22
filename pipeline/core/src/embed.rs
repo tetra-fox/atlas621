@@ -296,7 +296,7 @@ pub fn embed(pairs: &Pairs, post_counts: &[u32], posts: u64, params: &EmbedParam
     );
     let matrix = Csr::symmetric(core.len(), entries.iter().copied());
     info!(
-        "ppmi over {} core tags (>= {} posts): {} positive pairs of {} with count >= {}, {:.0?}",
+        "ppmi over {} core nodes (>= {} posts): {} positive pairs of {} with count >= {}, {:.0?}",
         core.len(),
         params.core_floor,
         entries.len(),
@@ -358,7 +358,7 @@ pub fn embed(pairs: &Pairs, post_counts: &[u32], posts: u64, params: &EmbedParam
     drop(v);
     let zero_tail = normalize_rows(&mut tail_vectors, params.dim);
     info!(
-        "{} tail tags folded in, {} of them with no core pair at all ({zero_core} core rows and {zero_tail} tail rows are zero), {:.0?}",
+        "{} tail nodes folded in, {} of them with no core pair at all ({zero_core} core rows and {zero_tail} tail rows are zero), {:.0?}",
         tail.len(),
         no_row.iter().filter(|&&z| z).count(),
         t0.elapsed()
@@ -366,7 +366,7 @@ pub fn embed(pairs: &Pairs, post_counts: &[u32], posts: u64, params: &EmbedParam
 
     let (core_knn, core_knn_sim) = nearest(&vectors, &vectors, params.dim, params.neighbors, |i| i);
     info!(
-        "{} nearest core tags per core tag, {:.0?}",
+        "{} nearest core nodes per core tag, {:.0?}",
         params.neighbors,
         t0.elapsed()
     );
@@ -385,7 +385,7 @@ pub fn embed(pairs: &Pairs, post_counts: &[u32], posts: u64, params: &EmbedParam
         }
     }
     info!(
-        "{} nearest core tags per tail tag, {:.0?}",
+        "{} nearest core nodes per tail tag, {:.0?}",
         params.tail_neighbors,
         t0.elapsed()
     );

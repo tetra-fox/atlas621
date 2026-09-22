@@ -28,8 +28,9 @@ struct Optimizer {
 
 const MOMENTUM: f64 = 0.8;
 const MAX_STEP: f64 = 5.0;
-const MIN_GAIN: f64 = 0.01;
-// nudges tags off a shared starting point so the gradient can pull them apart
+// added back on every decay, so the gain settles at GAIN_ADD / (1 - GAIN_DECAY)
+const GAIN_ADD: f64 = 0.01;
+// nudges nodes off a shared starting point so the gradient can pull them apart
 const JITTER_SD: f64 = 2e-5;
 
 fn jitter(rng: &mut StdRng) -> f64 {
@@ -60,7 +61,7 @@ impl Optimizer {
                     g[c] = if (u[c] < 0.0) != (d[c] < 0.0) {
                         g[c] + GAIN_RISE
                     } else {
-                        g[c] * GAIN_DECAY + MIN_GAIN
+                        g[c] * GAIN_DECAY + GAIN_ADD
                     };
                     u[c] = MOMENTUM * u[c] - lr * g[c] * d[c];
                 }
@@ -530,7 +531,7 @@ pub fn layout(
                 };
             }
             info!(
-                "warm start: {} core tags keep their previous position, {from_region} start at their region's, {from_ties} where the ties put their region",
+                "warm start: {} core nodes keep their previous position, {from_region} start at their region's, {from_ties} where the ties put their region",
                 kept.len()
             );
             old
@@ -538,7 +539,7 @@ pub fn layout(
     };
     let p = affinity_csr(n, emb, graph);
     info!(
-        "affinities: {} entries over {nc} core tags, {:.0?}",
+        "affinities: {} entries over {nc} core nodes, {:.0?}",
         p.len(),
         t0.elapsed()
     );
@@ -610,7 +611,7 @@ pub fn layout(
         .max(1e-9);
     let s = params.extent as f64 / max;
     info!(
-        "{} tail tags placed next to the core tags they resemble, {unplaced} with no core pair put at the centre, {:.0?}",
+        "{} tail nodes placed next to the core nodes they resemble, {unplaced} with no core pair put at the centre, {:.0?}",
         emb.tail.len(),
         t0.elapsed()
     );

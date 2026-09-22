@@ -113,7 +113,6 @@ const placeTerritoryNames = (
   const ppu = Math.abs(sx);
   const placed: Rect[] = [];
   for (const f of terr.features) {
-    if (!f.label) continue;
     const widthPx = (f.bbox[2] - f.bbox[0]) * ppu;
     if (widthPx < 70) continue;
     const name = terr.names[f.community] ?? "";
