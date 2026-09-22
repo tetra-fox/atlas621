@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
 use flate2::bufread::MultiGzDecoder;
-use tracing::info;
+use tracing::{debug, info};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -57,12 +57,18 @@ pub fn find<'a>(manifest: &'a [Export], name: &str) -> Result<&'a Export> {
         .with_context(|| format!("export {name} not in manifest"))
 }
 
-pub fn ensure(export: &Export, cache: &Path) -> Result<PathBuf> {
+// the bool says the file came over the network rather than out of the cache
+pub fn ensure(export: &Export, cache: &Path) -> Result<(PathBuf, bool)> {
     let path = cache.join(&export.file_name);
     if let Ok(meta) = fs::metadata(&path)
         && meta.len() == export.file_size
     {
-        return Ok(path);
+        debug!(
+            file = %export.file_name,
+            mb = export.file_size / 1_000_000,
+            "cached"
+        );
+        return Ok((path, false));
     }
     info!(
         "downloading {} ({} MB)",
@@ -89,7 +95,7 @@ pub fn ensure(export: &Export, cache: &Path) -> Result<PathBuf> {
         );
     }
     fs::rename(&part, &path)?;
-    Ok(path)
+    Ok((path, true))
 }
 
 fn sha256_hex(path: &Path) -> Result<String> {

@@ -290,18 +290,24 @@ impl Ctx {
         manifest: &[exports::Export],
         name: &str,
     ) -> Result<Box<dyn std::io::Read + Send>> {
-        exports::open(&exports::ensure(
-            exports::find(manifest, name)?,
-            &self.cli_cache,
-        )?)
+        exports::open(
+            &exports::ensure(exports::find(manifest, name)?, &self.cli_cache)?.0,
+        )
     }
 }
 
 fn fetch(ctx: &Ctx) -> Result<()> {
     let manifest = ctx.manifest()?;
+    let mut downloaded = 0;
     for name in exports::NEEDED {
-        exports::ensure(exports::find(&manifest, name)?, &ctx.cli_cache)?;
+        let (_, fetched) = exports::ensure(exports::find(&manifest, name)?, &ctx.cli_cache)?;
+        downloaded += usize::from(fetched);
     }
+    let total = exports::NEEDED.len();
+    info!(
+        "{total} exports: {} from cache, {downloaded} downloaded",
+        total - downloaded
+    );
     Ok(())
 }
 
