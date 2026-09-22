@@ -294,6 +294,14 @@
   });
 
   const labelIndex = $derived(buildLabelIndex(core.positions, space));
+  // depends only on the loaded dataset, so keep it out of the scene object below, which
+  // rebuilds every time the hover moves
+  const regions = $derived(
+    prepareTerritories(
+      territories.regions,
+      communities.regions.map((c) => c.name)
+    )
+  );
   const overlayScene = $derived({
     positions: pointPositions,
     index: labelIndex,
@@ -301,10 +309,7 @@
     postCounts: core.postCounts,
     categories: core.categories,
     sizes,
-    regions: prepareTerritories(
-      territories.regions,
-      communities.regions.map((c) => c.name)
-    ),
+    regions,
     communities,
     territories: ui.territories,
     labels: ui.labels,
