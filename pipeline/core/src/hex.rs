@@ -85,7 +85,7 @@ impl Grid {
 
 fn disc(q: i32, r: i32, rings: usize) -> Vec<(i32, i32)> {
     let n = rings as i32;
-    let mut out = Vec::with_capacity((1 + 3 * rings * (rings + 1)) as usize);
+    let mut out = Vec::with_capacity(1 + 3 * rings * (rings + 1));
     for dq in -n..=n {
         for dr in (-n).max(-dq - n)..=n.min(-dq + n) {
             out.push((q + dq, r + dr));

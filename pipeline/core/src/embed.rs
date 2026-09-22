@@ -145,8 +145,8 @@ fn randomized_svd(a: &Csr<f32>, n: usize, params: &EmbedParams) -> (Vec<f32>, Ve
             .for_each(|(dst, src)| {
                 for (d, &e) in order.iter().enumerate() {
                     let mut s = 0f64;
-                    for i in 0..w {
-                        s += src[i] as f64 * eig.eigenvectors[(i, e)];
+                    for (i, &v) in src.iter().enumerate() {
+                        s += v as f64 * eig.eigenvectors[(i, e)];
                     }
                     dst[d] = (s * scale[d]) as f32;
                 }
@@ -187,7 +187,7 @@ fn normalize_rows(x: &mut [f32], w: usize) -> usize {
 
 fn dot(a: &[f32], b: &[f32]) -> f32 {
     let mut acc = [0f32; 8];
-    for (ca, cb) in a.chunks_exact(8).zip(b.chunks_exact(8)) {
+    for (ca, cb) in a.as_chunks::<8>().0.iter().zip(b.as_chunks::<8>().0) {
         for l in 0..8 {
             acc[l] += ca[l] * cb[l];
         }
@@ -252,7 +252,10 @@ fn nearest(
 pub fn embed(pairs: &Pairs, post_counts: &[u32], posts: u64, params: &EmbedParams) -> Embedding {
     let t0 = Instant::now();
     let n = post_counts.len();
-    assert!(params.dim % 8 == 0, "the dot product runs eight lanes wide");
+    assert!(
+        params.dim.is_multiple_of(8),
+        "the dot product runs eight lanes wide"
+    );
     let mut core = Vec::new();
     let mut tail = Vec::new();
     let mut row = vec![u32::MAX; n];
