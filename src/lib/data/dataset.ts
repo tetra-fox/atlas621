@@ -170,11 +170,15 @@ export const loadNodeText = async (
   return (await p)[String(node)];
 };
 
-// must agree with shard_key in the pipeline's search.rs, which named the shard files
+// must agree with shard_key in the pipeline's search.rs, which named the shard files: the first
+// two code points, not the first two utf-16 units
 export const shardKey = (query: string): string => {
   let key = "";
-  for (const ch of (query + "__").slice(0, 2)) key += /[a-z0-9]/.test(ch) ? ch : "_";
-  return key;
+  for (const ch of query) {
+    if (key.length === 2) break;
+    key += /^[a-z0-9]$/.test(ch) ? ch : "_";
+  }
+  return key.padEnd(2, "_");
 };
 
 const searchCache = new Map<string, Promise<SearchEntry[]>>();
