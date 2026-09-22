@@ -1,8 +1,8 @@
 use std::time::Instant;
 
-use tracing::{debug, info};
 use rand::prelude::*;
 use rayon::prelude::*;
+use tracing::{debug, info};
 
 use crate::csr::Csr;
 use crate::edges::Edges;
@@ -333,7 +333,6 @@ impl Layout {
         }
         recenter(&mut self.pos);
     }
-
 }
 
 #[cfg(test)]

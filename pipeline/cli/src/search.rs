@@ -152,7 +152,14 @@ mod shard_tests {
             .schema()
             .fields()
             .iter()
-            .map(|f| format!("{}:{}{}", f.name(), f.data_type(), if f.is_nullable() { "?" } else { "" }))
+            .map(|f| {
+                format!(
+                    "{}:{}{}",
+                    f.name(),
+                    f.data_type(),
+                    if f.is_nullable() { "?" } else { "" }
+                )
+            })
             .collect();
         assert_eq!(
             schema.join(" "),

@@ -147,5 +147,8 @@ pub fn read_strings(bytes: &[u8], name: &str) -> Result<Vec<String>> {
         .as_any()
         .downcast_ref::<StringArray>()
         .ok_or_else(|| anyhow::anyhow!("{name} is not a string column"))?;
-    Ok(text.iter().map(|s| s.unwrap_or_default().to_string()).collect())
+    Ok(text
+        .iter()
+        .map(|s| s.unwrap_or_default().to_string())
+        .collect())
 }

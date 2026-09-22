@@ -1,9 +1,9 @@
 use std::time::Instant;
 
-use tracing::{debug, info, trace};
 use nalgebra::DMatrix;
 use rand::prelude::*;
 use rayon::prelude::*;
+use tracing::{debug, info, trace};
 
 use crate::csr::Csr;
 use crate::edges::Edges;
@@ -104,11 +104,7 @@ fn orthonormalize(x: &mut [f32], w: usize) {
     }
 }
 
-fn randomized_svd(
-    a: &Csr<f32>,
-    n: usize,
-    params: &EmbedParams,
-) -> (Vec<f32>, Vec<f32>, Vec<f64>) {
+fn randomized_svd(a: &Csr<f32>, n: usize, params: &EmbedParams) -> (Vec<f32>, Vec<f32>, Vec<f64>) {
     let t0 = Instant::now();
     let w = params.dim + params.oversample;
     debug!(
@@ -253,12 +249,7 @@ fn nearest(
     (idx, sim)
 }
 
-pub fn embed(
-    pairs: &Pairs,
-    post_counts: &[u32],
-    posts: u64,
-    params: &EmbedParams,
-) -> Embedding {
+pub fn embed(pairs: &Pairs, post_counts: &[u32], posts: u64, params: &EmbedParams) -> Embedding {
     let t0 = Instant::now();
     let n = post_counts.len();
     assert!(params.dim % 8 == 0, "the dot product runs eight lanes wide");
@@ -285,11 +276,21 @@ pub fn embed(
             if c < params.min_count || !is_core(a) || !is_core(b) {
                 return None;
             }
-            let v = pmi(c, posts, post_counts[a as usize], post_counts[b as usize], params.shift);
+            let v = pmi(
+                c,
+                posts,
+                post_counts[a as usize],
+                post_counts[b as usize],
+                params.shift,
+            );
             (v > 0.0).then_some((row[a as usize], row[b as usize], v as f32))
         })
         .collect();
-    trace!(core = core.len(), tail = tail.len(), "split tags by the core floor");
+    trace!(
+        core = core.len(),
+        tail = tail.len(),
+        "split tags by the core floor"
+    );
     let matrix = Csr::symmetric(core.len(), entries.iter().copied());
     info!(
         "ppmi over {} core tags (>= {} posts): {} positive pairs of {} with count >= {}, {:.0?}",
@@ -303,13 +304,11 @@ pub fn embed(
     drop(entries);
     let (mut vectors, v, sigma) = randomized_svd(&matrix, core.len(), params);
     drop(matrix);
-    vectors
-        .par_chunks_mut(params.dim)
-        .for_each(|r| {
-            for (x, s) in r.iter_mut().zip(&sigma) {
-                *x *= s.sqrt() as f32;
-            }
-        });
+    vectors.par_chunks_mut(params.dim).for_each(|r| {
+        for (x, s) in r.iter_mut().zip(&sigma) {
+            *x *= s.sqrt() as f32;
+        }
+    });
     let zero_core = normalize_rows(&mut vectors, params.dim);
 
     let tail_entries: Vec<(u32, u32, f32)> = pairs
@@ -323,13 +322,22 @@ pub fn embed(
                 (true, false) => (b, a),
                 _ => return None,
             };
-            let v = pmi(c, posts, post_counts[t as usize], post_counts[k as usize], params.shift);
+            let v = pmi(
+                c,
+                posts,
+                post_counts[t as usize],
+                post_counts[k as usize],
+                params.shift,
+            );
             (v > 0.0).then_some((row[t as usize], row[k as usize], v as f32))
         })
         .collect();
     let rows = Csr::directed(tail.len(), tail_entries.iter().copied());
     drop(tail_entries);
-    let scale: Vec<f32> = sigma.iter().map(|s| (1.0 / s.max(1e-12).sqrt()) as f32).collect();
+    let scale: Vec<f32> = sigma
+        .iter()
+        .map(|s| (1.0 / s.max(1e-12).sqrt()) as f32)
+        .collect();
     let mut tail_vectors = vec![0f32; tail.len() * params.dim];
     tail_vectors
         .par_chunks_mut(params.dim)
@@ -354,7 +362,11 @@ pub fn embed(
     );
 
     let (core_knn, core_knn_sim) = nearest(&vectors, &vectors, params.dim, params.neighbors, |i| i);
-    info!("{} nearest core tags per core tag, {:.0?}", params.neighbors, t0.elapsed());
+    info!(
+        "{} nearest core tags per core tag, {:.0?}",
+        params.neighbors,
+        t0.elapsed()
+    );
     let (mut tail_knn, mut tail_knn_sim) = nearest(
         &tail_vectors,
         &vectors,
@@ -390,8 +402,12 @@ pub fn knn_edges(emb: &Embedding, k: usize, kt: usize, pairs: &Pairs) -> Edges {
     let t0 = Instant::now();
     let kn = emb.core_knn.len() / emb.core.len();
     let kept = emb.tail_knn.len() / emb.tail.len().max(1);
-    assert!(k <= kn && kt <= kept, "the graph asks for more neighbors than were kept");
-    let mut list: Vec<(u32, u32, f32)> = Vec::with_capacity(emb.core.len() * k + emb.tail.len() * kt);
+    assert!(
+        k <= kn && kt <= kept,
+        "the graph asks for more neighbors than were kept"
+    );
+    let mut list: Vec<(u32, u32, f32)> =
+        Vec::with_capacity(emb.core.len() * k + emb.tail.len() * kt);
     let mut push = |a: u32, b: u32, w: f32| {
         if a != b {
             list.push((a.min(b), a.max(b), w.clamp(0.0, 1.0)));

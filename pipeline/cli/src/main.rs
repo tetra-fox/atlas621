@@ -290,9 +290,7 @@ impl Ctx {
         manifest: &[exports::Export],
         name: &str,
     ) -> Result<Box<dyn std::io::Read + Send>> {
-        exports::open(
-            &exports::ensure(exports::find(manifest, name)?, &self.cli_cache)?.0,
-        )
+        exports::open(&exports::ensure(exports::find(manifest, name)?, &self.cli_cache)?.0)
     }
 }
 
@@ -395,7 +393,12 @@ fn embed(ctx: &Ctx, args: &EmbedArgs) -> Result<()> {
         },
     );
     ctx.store.save_embedding(&embedding)?;
-    let graph = embed::knn_edges(&embedding, args.graph_neighbors, args.graph_tail_neighbors, &node_pairs);
+    let graph = embed::knn_edges(
+        &embedding,
+        args.graph_neighbors,
+        args.graph_tail_neighbors,
+        &node_pairs,
+    );
     drop(node_pairs);
     ctx.store.save_edges("knn", &graph)?;
     let affinities = tsne::affinity_edges(&embedding, args.perplexity, args.graph_tail_neighbors);
@@ -502,10 +505,12 @@ fn territories(ctx: &Ctx, args: &TerritoryArgs) -> Result<()> {
         continent_of_region: hex::continent_of_region(&regions, &continents),
     };
     ctx.store.save("territories.region", &regions.membership)?;
-    ctx.store.save("territories.continent", &continents.membership)?;
+    ctx.store
+        .save("territories.continent", &continents.membership)?;
     ctx.store.save_json("territories", &meta)?;
     ctx.store.save_json("territories.regions", &regions.level)?;
-    ctx.store.save_json("territories.continents", &continents.level)
+    ctx.store
+        .save_json("territories.continents", &continents.level)
 }
 
 fn text(ctx: &Ctx, args: &TextArgs) -> Result<()> {
@@ -697,4 +702,3 @@ fn main() -> Result<()> {
     t.digest();
     out
 }
-

@@ -1,11 +1,11 @@
-use ts_rs::TS;
 use std::time::Instant;
+use ts_rs::TS;
 
 use anyhow::Result;
 use geo::{Area, Coord, LineString, Polygon, unary_union};
-use tracing::{debug, info, trace};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
+use tracing::{debug, info, trace};
 
 pub struct CutParams {
     pub hex_cols: usize,
@@ -100,10 +100,14 @@ fn hex_distance(a: (i32, i32), b: (i32, i32)) -> i32 {
 }
 
 fn basins(occupied: &[(i32, i32)], counts: &[u32], rings: usize, min_nodes: usize) -> Vec<u32> {
-    let mut hexes: Vec<(i32, i32)> = occupied.iter().flat_map(|&(q, r)| disc(q, r, rings)).collect();
+    let mut hexes: Vec<(i32, i32)> = occupied
+        .iter()
+        .flat_map(|&(q, r)| disc(q, r, rings))
+        .collect();
     hexes.sort_unstable();
     hexes.dedup();
-    let index: FxHashMap<(i32, i32), usize> = hexes.iter().enumerate().map(|(i, &h)| (h, i)).collect();
+    let index: FxHashMap<(i32, i32), usize> =
+        hexes.iter().enumerate().map(|(i, &h)| (h, i)).collect();
     let mut count = vec![0u32; hexes.len()];
     for (h, &c) in occupied.iter().zip(counts) {
         count[index[h]] = c;
@@ -112,23 +116,36 @@ fn basins(occupied: &[(i32, i32)], counts: &[u32], rings: usize, min_nodes: usiz
         .iter()
         .map(|&(q, r)| {
             let around = disc(q, r, rings);
-            let total: u32 = around.iter().filter_map(|h| index.get(h)).map(|&i| count[i]).sum();
+            let total: u32 = around
+                .iter()
+                .filter_map(|h| index.get(h))
+                .map(|&i| count[i])
+                .sum();
             total as f64 / around.len() as f64
         })
         .collect();
     let mut order: Vec<usize> = (0..hexes.len()).collect();
-    order.sort_unstable_by(|&a, &b| density[b].total_cmp(&density[a]).then(hexes[a].cmp(&hexes[b])));
+    order.sort_unstable_by(|&a, &b| {
+        density[b]
+            .total_cmp(&density[a])
+            .then(hexes[a].cmp(&hexes[b]))
+    });
     let neighbors = |i: usize| {
         let (q, r) = hexes[i];
         let index = &index;
-        DIRS.iter().filter_map(move |&(dq, dr)| index.get(&(q + dq, r + dr)).copied())
+        DIRS.iter()
+            .filter_map(move |&(dq, dr)| index.get(&(q + dq, r + dr)).copied())
     };
     let mut basin = vec![u32::MAX; hexes.len()];
     let mut next = 0u32;
     for &i in &order {
         let uphill = neighbors(i)
             .filter(|&j| basin[j] != u32::MAX)
-            .max_by(|&a, &b| density[a].total_cmp(&density[b]).then(basin[b].cmp(&basin[a])));
+            .max_by(|&a, &b| {
+                density[a]
+                    .total_cmp(&density[b])
+                    .then(basin[b].cmp(&basin[a]))
+            });
         basin[i] = match uphill {
             Some(j) => basin[j],
             None => {
@@ -167,7 +184,11 @@ fn basins(occupied: &[(i32, i32)], counts: &[u32], rings: usize, min_nodes: usiz
                     (0..hexes.len())
                         .filter(|&j| basin[j] != b)
                         .map(|j| {
-                            let gap = mine.iter().map(|&i| hex_distance(hexes[i], hexes[j])).min().unwrap();
+                            let gap = mine
+                                .iter()
+                                .map(|&i| hex_distance(hexes[i], hexes[j]))
+                                .min()
+                                .unwrap();
                             (gap, basin[j])
                         })
                         .min()
@@ -195,7 +216,10 @@ fn basins(occupied: &[(i32, i32)], counts: &[u32], rings: usize, min_nodes: usiz
     for (k, &b) in ids.iter().enumerate() {
         rank[b as usize] = k as u32;
     }
-    occupied.iter().map(|h| rank[basin[index[h]] as usize]).collect()
+    occupied
+        .iter()
+        .map(|h| rank[basin[index[h]] as usize])
+        .collect()
 }
 
 pub fn cut(pos: &[[f32; 2]], params: &CutParams) -> Result<Cut> {
@@ -215,11 +239,15 @@ pub fn cut(pos: &[[f32; 2]], params: &CutParams) -> Result<Cut> {
     let grid = Grid {
         size: (hi - lo) / (SQRT3 * params.hex_cols as f64),
     };
-    let cells: Vec<(i32, i32)> = pos.iter().map(|p| grid.cell(p[0] as f64, p[1] as f64)).collect();
+    let cells: Vec<(i32, i32)> = pos
+        .iter()
+        .map(|p| grid.cell(p[0] as f64, p[1] as f64))
+        .collect();
     let mut hexes: Vec<(i32, i32)> = cells.clone();
     hexes.sort_unstable();
     hexes.dedup();
-    let index: FxHashMap<(i32, i32), usize> = hexes.iter().enumerate().map(|(i, &h)| (h, i)).collect();
+    let index: FxHashMap<(i32, i32), usize> =
+        hexes.iter().enumerate().map(|(i, &h)| (h, i)).collect();
     let mut counts = vec![0u32; hexes.len()];
     for c in &cells {
         counts[index[c]] += 1;
@@ -378,7 +406,13 @@ mod tests {
         assert!(b[..5].iter().all(|&x| x == b[0]));
         assert!(b[5..11].iter().all(|&x| x == b[5]));
         assert!(b[0] != b[5]);
-        assert_eq!(b[11], b[0], "two hexes off the first coast, one smoothing ring each side");
-        assert_eq!(b[12], b[5], "out of reach of both, eight hexes from the second coast, eleven from the first");
+        assert_eq!(
+            b[11], b[0],
+            "two hexes off the first coast, one smoothing ring each side"
+        );
+        assert_eq!(
+            b[12], b[5],
+            "out of reach of both, eight hexes from the second coast, eleven from the first"
+        );
     }
 }

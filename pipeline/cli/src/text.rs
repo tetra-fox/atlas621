@@ -1,14 +1,14 @@
-use ts_rs::TS;
 use std::collections::BTreeMap;
 use std::io::Read;
 use std::time::Instant;
+use ts_rs::TS;
 
 use anyhow::Result;
 use jiff::civil;
-use tracing::{debug, info, warn};
 use regex::Regex;
 use rustc_hash::{FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
+use tracing::{debug, info, warn};
 
 use crate::exports;
 use crate::posts::YEAR0;
@@ -397,12 +397,16 @@ pub fn build(
             if let Some(ci) = ci
                 && (ci as usize) < n_nodes
             {
-                text_for(&mut shards, shard_size, ci).parents.push(parent.clone());
+                text_for(&mut shards, shard_size, ci)
+                    .parents
+                    .push(parent.clone());
             }
             if let Some(pi) = pi
                 && (pi as usize) < n_nodes
             {
-                text_for(&mut shards, shard_size, pi).children.push(child.clone());
+                text_for(&mut shards, shard_size, pi)
+                    .children
+                    .push(child.clone());
             }
             let bur = op_date.get(&("implicate".to_string(), child.clone(), parent.clone()));
             let (date, approx, source) = match bur {
@@ -506,8 +510,14 @@ pub fn build(
 
     for shard in shards.values_mut() {
         for t in shard.values_mut() {
-            t.history.sort_by(|x, y| x.date.cmp(&y.date).then(x.kind.cmp(&y.kind)).then(x.other.cmp(&y.other)));
-            t.history.dedup_by(|x, y| x.date == y.date && x.kind == y.kind && x.other == y.other);
+            t.history.sort_by(|x, y| {
+                x.date
+                    .cmp(&y.date)
+                    .then(x.kind.cmp(&y.kind))
+                    .then(x.other.cmp(&y.other))
+            });
+            t.history
+                .dedup_by(|x, y| x.date == y.date && x.kind == y.kind && x.other == y.other);
         }
     }
     if unknown_lines > 2000 {

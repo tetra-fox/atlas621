@@ -2,9 +2,9 @@ use std::time::Instant;
 
 use anyhow::{Context, Result};
 use leiden_rs::{GraphDataBuilder, Leiden, LeidenConfig};
-use tracing::{debug, info, trace};
 use rand::prelude::*;
 use rustc_hash::FxHashMap;
+use tracing::{debug, info, trace};
 
 use crate::csr::Csr;
 use crate::edges::Edges;
@@ -77,7 +77,10 @@ fn absorb_small(membership: &mut [usize], edges: &Edges, min_size: usize) -> usi
             }
         }
         moved += changed;
-        trace!(changed, min_size, "absorbed communities below the size floor");
+        trace!(
+            changed,
+            min_size, "absorbed communities below the size floor"
+        );
         if changed == 0 {
             break;
         }
@@ -150,7 +153,12 @@ fn local_moving_sweeps(
             touched.clear();
         }
         moves += moved_this_sweep;
-        debug!(sweep = sweep + 1, of = sweeps, moved = moved_this_sweep, "local moving sweep");
+        debug!(
+            sweep = sweep + 1,
+            of = sweeps,
+            moved = moved_this_sweep,
+            "local moving sweep"
+        );
         if moved_this_sweep == 0 {
             break;
         }
@@ -221,7 +229,12 @@ fn attach_tail(
     (attached, stranded)
 }
 
-pub fn detect(edges: &Edges, n: usize, post_counts: &[u32], params: &CommunityParams) -> Result<Vec<u32>> {
+pub fn detect(
+    edges: &Edges,
+    n: usize,
+    post_counts: &[u32],
+    params: &CommunityParams,
+) -> Result<Vec<u32>> {
     let t0 = Instant::now();
     debug!(
         resolution = params.region_resolution,

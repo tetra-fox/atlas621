@@ -1,9 +1,9 @@
 use std::time::Instant;
 
-use tracing::info;
 use nalgebra::DMatrix;
 use rand::prelude::*;
 use rayon::prelude::*;
+use tracing::info;
 
 use crate::csr::Csr;
 use crate::edges::Edges;
@@ -112,7 +112,11 @@ fn row_affinities(d2: &[f64], perplexity: f64) -> Vec<f64> {
         }
         if diff > 0.0 {
             lo = beta;
-            beta = if hi.is_finite() { (beta + hi) / 2.0 } else { beta * 2.0 };
+            beta = if hi.is_finite() {
+                (beta + hi) / 2.0
+            } else {
+                beta * 2.0
+            };
         } else {
             hi = beta;
             beta = (beta + lo) / 2.0;
@@ -139,14 +143,21 @@ fn exact_tsne(dist: &[f64], k: usize, perplexity: f64) -> Vec<[f64; 2]> {
         }
     }
     let deg: Vec<f64> = (0..k).map(|i| (0..k).map(|j| p[i * k + j]).sum()).collect();
-    let m = DMatrix::from_fn(k, k, |i, j| p[i * k + j] / (deg[i] * deg[j]).sqrt().max(1e-12));
+    let m = DMatrix::from_fn(k, k, |i, j| {
+        p[i * k + j] / (deg[i] * deg[j]).sqrt().max(1e-12)
+    });
     let eig = m.symmetric_eigen();
     let mut order: Vec<usize> = (0..k).collect();
     order.sort_unstable_by(|&a, &b| eig.eigenvalues[b].total_cmp(&eig.eigenvalues[a]));
     // the leading eigenvector of a normalized affinity matrix is constant, so start from the
     // next two
     let mut pos: Vec<[f64; 2]> = (0..k)
-        .map(|i| [eig.eigenvectors[(i, order[1])], eig.eigenvectors[(i, order[2])]])
+        .map(|i| {
+            [
+                eig.eigenvectors[(i, order[1])],
+                eig.eigenvectors[(i, order[2])],
+            ]
+        })
         .collect();
     rescale(&mut pos, 1e-4);
     let mut grad = vec![[0.0; 2]; k];
@@ -202,7 +213,9 @@ fn place_regions(graph: &Edges, region: &[u32], k: usize, perplexity: f64) -> Ve
             tie[b * k + a] += e.weight as f64;
         }
     }
-    let deg: Vec<f64> = (0..k).map(|i| (0..k).map(|j| tie[i * k + j]).sum::<f64>().max(1.0)).collect();
+    let deg: Vec<f64> = (0..k)
+        .map(|i| (0..k).map(|j| tie[i * k + j]).sum::<f64>().max(1.0))
+        .collect();
     let mut norm = vec![0.0; k * k];
     let mut max = 0.0f64;
     for i in 0..k {
@@ -212,7 +225,13 @@ fn place_regions(graph: &Edges, region: &[u32], k: usize, perplexity: f64) -> Ve
         }
     }
     let dist: Vec<f64> = (0..k * k)
-        .map(|x| if x / k == x % k { 0.0 } else { 1.0 - norm[x] / max.max(1e-12) })
+        .map(|x| {
+            if x / k == x % k {
+                0.0
+            } else {
+                1.0 - norm[x] / max.max(1e-12)
+            }
+        })
         .collect();
     exact_tsne(&dist, k, perplexity)
 }
@@ -346,10 +365,12 @@ fn gradient(pos: &[[f64; 2]], p: &Csr<f32>, exaggeration: f64, theta: f32, grad:
         )
         .collect();
     let z: f64 = parts.iter().map(|p| p.2).sum::<f64>().max(1e-300);
-    grad.par_iter_mut().zip(&parts).for_each(|(g, (attr, rep, _))| {
-        g[0] = attr[0] - rep[0] / z;
-        g[1] = attr[1] - rep[1] / z;
-    });
+    grad.par_iter_mut()
+        .zip(&parts)
+        .for_each(|(g, (attr, rep, _))| {
+            g[0] = attr[0] - rep[0] / z;
+            g[1] = attr[1] - rep[1] / z;
+        });
 }
 
 fn spacing(pos: &[[f64; 2]]) -> Vec<f64> {
@@ -406,7 +427,8 @@ fn spacing(pos: &[[f64; 2]]) -> Vec<f64> {
                                 continue;
                             }
                             let q = pos[j as usize];
-                            let d = ((q[0] - pos[i][0]).powi(2) + (q[1] - pos[i][1]).powi(2)).sqrt();
+                            let d =
+                                ((q[0] - pos[i][0]).powi(2) + (q[1] - pos[i][1]).powi(2)).sqrt();
                             if best.len() < K {
                                 best.push(d);
                                 best.sort_by(f64::total_cmp);
@@ -468,16 +490,25 @@ pub fn layout(
                     count[r] += 1;
                 }
             }
-            let kept: Vec<[f64; 2]> = old.iter().zip(&seen).filter(|(_, s)| **s).map(|(p, _)| *p).collect();
+            let kept: Vec<[f64; 2]> = old
+                .iter()
+                .zip(&seen)
+                .filter(|(_, s)| **s)
+                .map(|(p, _)| *p)
+                .collect();
             let mut scaled = kept.clone();
             rescale(&mut scaled, 1e-4);
             let factor = if kept.len() > 1 {
                 (scaled[0][0] - scaled[1][0]).hypot(scaled[0][1] - scaled[1][1])
-                    / (kept[0][0] - kept[1][0]).hypot(kept[0][1] - kept[1][1]).max(1e-300)
+                    / (kept[0][0] - kept[1][0])
+                        .hypot(kept[0][1] - kept[1][1])
+                        .max(1e-300)
             } else {
                 1.0
             };
-            let (mx, my) = kept.iter().fold((0.0, 0.0), |(x, y), p| (x + p[0], y + p[1]));
+            let (mx, my) = kept
+                .iter()
+                .fold((0.0, 0.0), |(x, y), p| (x + p[0], y + p[1]));
             let (mx, my) = (mx / kept.len().max(1) as f64, my / kept.len().max(1) as f64);
             let mut from_region = 0;
             let mut from_ties = 0;
@@ -487,7 +518,10 @@ pub fn layout(
                     [(old[i][0] - mx) * factor, (old[i][1] - my) * factor]
                 } else if count[r] > 0 {
                     from_region += 1;
-                    let c = [(sum[r][0] / count[r] as f64 - mx) * factor, (sum[r][1] / count[r] as f64 - my) * factor];
+                    let c = [
+                        (sum[r][0] / count[r] as f64 - mx) * factor,
+                        (sum[r][1] / count[r] as f64 - my) * factor,
+                    ];
                     [c[0] + jitter(&mut rng), c[1] + jitter(&mut rng)]
                 } else {
                     from_ties += 1;
@@ -503,14 +537,19 @@ pub fn layout(
         }
     };
     let p = affinity_csr(n, emb, graph);
-    info!("affinities: {} entries over {nc} core tags, {:.0?}", p.len(), t0.elapsed());
+    info!(
+        "affinities: {} entries over {nc} core tags, {:.0?}",
+        p.len(),
+        t0.elapsed()
+    );
     let mut opt = Optimizer::new(nc, nc as f64 / params.exaggeration);
     let mut grad = vec![[0.0; 2]; nc];
     for it in 1..=params.iterations {
         gradient(&pos, &p, params.exaggeration, params.theta, &mut grad);
         opt.step(&mut pos, &grad);
         if it % 50 == 0 || it == params.iterations {
-            let spread = (pos.iter().map(|p| p[0] * p[0] + p[1] * p[1]).sum::<f64>() / nc as f64).sqrt();
+            let spread =
+                (pos.iter().map(|p| p[0] * p[0] + p[1] * p[1]).sum::<f64>() / nc as f64).sqrt();
             info!(
                 "iteration {it}: exaggeration {}, rms radius {spread:.1}, {:.0?}",
                 params.exaggeration,
@@ -558,7 +597,10 @@ pub fn layout(
         };
         let angle = rng.random::<f64>() * std::f64::consts::TAU;
         let radius = r0 * rng.random::<f64>().sqrt();
-        all[node as usize] = [anchor[0] + radius * angle.cos(), anchor[1] + radius * angle.sin()];
+        all[node as usize] = [
+            anchor[0] + radius * angle.cos(),
+            anchor[1] + radius * angle.sin(),
+        ];
     }
     recenter(&mut all);
     let max = all
@@ -572,7 +614,9 @@ pub fn layout(
         emb.tail.len(),
         t0.elapsed()
     );
-    all.iter().map(|p| [(p[0] * s) as f32, (p[1] * s) as f32]).collect()
+    all.iter()
+        .map(|p| [(p[0] * s) as f32, (p[1] * s) as f32])
+        .collect()
 }
 
 #[cfg(test)]
@@ -583,8 +627,16 @@ mod tests {
     fn affinities_hit_the_perplexity() {
         let d2: Vec<f64> = (1..=60).map(|i| (i as f64).powi(2) / 100.0).collect();
         let p = row_affinities(&d2, 10.0);
-        let entropy: f64 = -p.iter().filter(|&&q| q > 0.0).map(|q| q * q.ln()).sum::<f64>();
-        assert!((entropy.exp() - 10.0).abs() < 0.01, "perplexity {}", entropy.exp());
+        let entropy: f64 = -p
+            .iter()
+            .filter(|&&q| q > 0.0)
+            .map(|q| q * q.ln())
+            .sum::<f64>();
+        assert!(
+            (entropy.exp() - 10.0).abs() < 0.01,
+            "perplexity {}",
+            entropy.exp()
+        );
         assert!((p.iter().sum::<f64>() - 1.0).abs() < 1e-9);
     }
 
@@ -601,7 +653,11 @@ mod tests {
             tail_knn_sim: vec![0.8, f32::NEG_INFINITY],
         };
         let edges = affinity_edges(&emb, 1.0, 2);
-        let tail: Vec<f32> = edges.iter().filter(|e| e.a == 1).map(|e| e.weight).collect();
+        let tail: Vec<f32> = edges
+            .iter()
+            .filter(|e| e.a == 1)
+            .map(|e| e.weight)
+            .collect();
         assert_eq!(tail, vec![1.0]);
         let p = affinity_csr(4, &emb, &edges);
         assert_eq!(p.len(), 6);
@@ -639,9 +695,14 @@ mod tests {
                 exact[0] -= q * q * d[0] / z;
                 exact[1] -= q * q * d[1] / z;
             }
-            let err = ((approx[i][0] - exact[0]).powi(2) + (approx[i][1] - exact[1]).powi(2)).sqrt();
+            let err =
+                ((approx[i][0] - exact[0]).powi(2) + (approx[i][1] - exact[1]).powi(2)).sqrt();
             let norm = (exact[0].powi(2) + exact[1].powi(2)).sqrt().max(1e-9);
-            assert!(err / norm < 0.05, "point {i}: relative error {}", err / norm);
+            assert!(
+                err / norm < 0.05,
+                "point {i}: relative error {}",
+                err / norm
+            );
         }
     }
 
@@ -659,7 +720,9 @@ mod tests {
             }
         }
         let pos = exact_tsne(&dist, k, 3.0);
-        let within = |a: usize, b: usize| ((pos[a][0] - pos[b][0]).powi(2) + (pos[a][1] - pos[b][1]).powi(2)).sqrt();
+        let within = |a: usize, b: usize| {
+            ((pos[a][0] - pos[b][0]).powi(2) + (pos[a][1] - pos[b][1]).powi(2)).sqrt()
+        };
         let same = within(0, 1).max(within(6, 7));
         let across = within(0, 6).min(within(1, 7));
         assert!(across > 2.0 * same, "same {same} across {across}");

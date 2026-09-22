@@ -4,8 +4,8 @@ use std::time::Instant;
 
 use anyhow::{Context, Result, anyhow, bail};
 use crossbeam_channel::{Receiver, bounded};
-use tracing::{info, warn};
 use rustc_hash::FxHashMap;
+use tracing::{info, warn};
 
 use atlas_core::pairs::Pairs;
 

@@ -1,8 +1,8 @@
 use std::io::Read;
 
 use anyhow::Result;
-use tracing::{info, warn};
 use rustc_hash::FxHashMap;
+use tracing::{info, warn};
 
 use crate::exports;
 

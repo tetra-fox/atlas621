@@ -1,22 +1,21 @@
-use ts_rs::TS;
 use std::cmp::Reverse;
 use std::collections::BTreeMap;
 use std::fs::{self, File};
 use std::io::{BufReader, BufWriter, Write};
 use std::path::{Path, PathBuf};
+use ts_rs::TS;
 
 use anyhow::{Context, Result, bail};
 use flate2::Compression;
 use flate2::write::GzEncoder;
-use tracing::{debug, info};
 use serde::{Deserialize, Serialize};
-
+use tracing::{debug, info};
 
 use atlas_core::bin::Le;
-use atlas_core::ipc::{self, Column};
 use atlas_core::edges::Edges;
 use atlas_core::embed::Embedding;
 use atlas_core::hex::{Feature, Level};
+use atlas_core::ipc::{self, Column};
 
 use crate::posts::{PostStats, YEAR0};
 use crate::store::Store;
@@ -149,7 +148,9 @@ impl Emitter {
         }
         let chunks: Vec<&[T]> = values.chunks(per_part).collect();
         for (k, chunk) in chunks.iter().enumerate() {
-            self.gz(&format!("{stem}.{k}.bin.gz"), |w| ipc::one(w, column, chunk))?;
+            self.gz(&format!("{stem}.{k}.bin.gz"), |w| {
+                ipc::one(w, column, chunk)
+            })?;
         }
         self.parts.insert(name.to_string(), chunks.len());
         Ok(())
@@ -378,7 +379,8 @@ fn tiles(
             .unwrap_or(cutoffs.len());
         let cells = 1usize << level;
         let p = positions[x as usize];
-        let at = |v: f32| (((v as f64 / SPACE_SIZE) * cells as f64).floor() as usize).min(cells - 1);
+        let at =
+            |v: f32| (((v as f64 / SPACE_SIZE) * cells as f64).floor() as usize).min(cells - 1);
         members[level][at(p[1]) * cells + at(p[0])].push(rank as u32);
     }
     for (level, cells) in members.iter().enumerate() {
@@ -559,7 +561,10 @@ fn vectors(e: &mut Emitter, emb: &Embedding, post_counts: &[u32], floor: u32) ->
     e.gz("vectors.bin.gz", |w| {
         ipc::write(
             w,
-            &[("node", u32::column(&nodes)), ("vector", ipc::rows(dim, &data)?)],
+            &[
+                ("node", u32::column(&nodes)),
+                ("vector", ipc::rows(dim, &data)?),
+            ],
         )
     })
 }
@@ -598,7 +603,12 @@ pub fn write(out_dir: &Path, store: &Store, inputs: EmitInputs) -> Result<()> {
     let positions: Vec<[f32; 2]> = inputs
         .positions
         .iter()
-        .map(|p| [(p[0] as f64 * scale + ox) as f32, (p[1] as f64 * scale + oy) as f32])
+        .map(|p| {
+            [
+                (p[0] as f64 * scale + ox) as f32,
+                (p[1] as f64 * scale + oy) as f32,
+            ]
+        })
         .collect();
     e.gz("positions.bin.gz", |w| {
         ipc::write(w, &[("position", ipc::rows(2, positions.as_flattened())?)])
@@ -636,8 +646,18 @@ pub fn write(out_dir: &Path, store: &Store, inputs: EmitInputs) -> Result<()> {
     e.gz("base.bin.gz", |w| edge_run(w, &base, &a, &b, &weight))?;
     tiles(&mut e, &inputs.tile_cutoffs, &positions, &a, &b, &weight)?;
     adjacency_shards(&mut e, inputs.adj_shard_size, n, &a, &b, &weight)?;
-    path_graph(&mut e, inputs.ties, &tags.post_counts[..n], inputs.playground_floor)?;
-    vectors(&mut e, inputs.embedding, &tags.post_counts[..n], inputs.playground_floor)?;
+    path_graph(
+        &mut e,
+        inputs.ties,
+        &tags.post_counts[..n],
+        inputs.playground_floor,
+    )?;
+    vectors(
+        &mut e,
+        inputs.embedding,
+        &tags.post_counts[..n],
+        inputs.playground_floor,
+    )?;
     let mut degree = vec![0u32; n];
     for &x in a.iter().chain(&b) {
         degree[x as usize] += 1;

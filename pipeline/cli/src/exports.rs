@@ -4,9 +4,9 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
 use flate2::bufread::MultiGzDecoder;
-use tracing::{debug, info};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use tracing::{debug, info};
 
 const MANIFEST_URL: &str = "https://e621.net/db_exports.json";
 const USER_AGENT: &str = "atlas621/0.1 (https://github.com/tetra-fox/atlas621)";

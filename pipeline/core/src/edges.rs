@@ -1,8 +1,8 @@
 use std::time::Instant;
 
-use tracing::info;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
+use tracing::info;
 
 use crate::csr::Csr;
 use crate::pairs::Pairs;
