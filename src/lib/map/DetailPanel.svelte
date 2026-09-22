@@ -106,12 +106,12 @@
   let pathBusy = $state(false);
   let pathMissing = $state(false);
   const pathTo = async (entry: SearchEntry) => {
-    if (entry.i < 0) return;
+    if (entry.node < 0) return;
     pathPicking = false;
     pathBusy = true;
     pathMissing = false;
     try {
-      const found = await findPath(core.manifest, node, entry.i);
+      const found = await findPath(core.manifest, node, entry.node);
       ui.path = found;
       pathMissing = found === null;
     } finally {

@@ -194,12 +194,14 @@
     if (!v) return [];
     return slots.flatMap(
       (s) =>
-        s.resolved?.terms.flatMap((t) => t.tags.filter((e) => v.row[e.i] < 0).map((e) => e.n)) ?? []
+        s.resolved?.terms.flatMap((t) =>
+          t.tags.filter((e) => v.row[e.node] < 0).map((e) => e.name)
+        ) ?? []
     );
   });
   const pct = (v: number) => `${(v * 100).toFixed(0)}%`;
   const label = (slot: Slot) =>
-    slot.resolved?.terms.flatMap((t) => t.tags.map((e) => e.a ?? e.n)).join(" ") || "…";
+    slot.resolved?.terms.flatMap((t) => t.tags.map((e) => e.alias ?? e.name)).join(" ") || "…";
 </script>
 
 {#snippet field(slot: Slot, placeholder: string, wide: boolean)}
@@ -221,15 +223,18 @@
             >{term.sign > 0 ? "+" : "−"}</span>
         {/if}
         {#if term.tags.length > 1}<span class="text-muted">(</span>{/if}
-        {#each term.tags as tag, j (tag.i)}
+        {#each term.tags as tag, j (tag.node)}
           {#if j > 0}<span class="text-muted">|</span>{/if}
           <a
-            href={tagPath(tag.a ?? tag.n)}
-            class={["tag-chip px-1.5 py-0.5", data && data.vectors.row[tag.i] < 0 && "opacity-50"]}
-            style:--tag={categoryCss(tag.k)}
-            style:--tag-alt={categoryHoverCss(tag.k)}
-            title={tag.a ? `${tag.n} is an alias of ${tag.a}` : undefined}
-            ><span class="text-(--tag) hover:text-(--tag-alt)">{tag.a ?? tag.n}</span></a>
+            href={tagPath(tag.alias ?? tag.name)}
+            class={[
+              "tag-chip px-1.5 py-0.5",
+              data && data.vectors.row[tag.node] < 0 && "opacity-50"
+            ]}
+            style:--tag={categoryCss(tag.category)}
+            style:--tag-alt={categoryHoverCss(tag.category)}
+            title={tag.alias ? `${tag.name} is an alias of ${tag.alias}` : undefined}
+            ><span class="text-(--tag) hover:text-(--tag-alt)">{tag.alias ?? tag.name}</span></a>
         {/each}
         {#if term.tags.length > 1}<span class="text-muted">)</span>{/if}
       {/each}

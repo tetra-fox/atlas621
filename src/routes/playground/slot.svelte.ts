@@ -21,7 +21,9 @@ export class Slot {
   }
 
   get terms(): Term[] {
-    return this.resolved?.terms.map((t) => ({ sign: t.sign, nodes: t.tags.map((e) => e.i) })) ?? [];
+    return (
+      this.resolved?.terms.map((t) => ({ sign: t.sign, nodes: t.tags.map((e) => e.node) })) ?? []
+    );
   }
 
   get nodes(): number[] {

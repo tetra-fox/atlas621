@@ -100,16 +100,21 @@ impl Store {
         Ok(serde_json::from_reader(BufReader::new(file))?)
     }
 
-    pub fn save_shards<'a, T: Serialize + 'a>(
-        &self,
-        dir: &str,
-        shards: impl Iterator<Item = (String, &'a T)>,
-    ) -> Result<()> {
+    pub fn shard_dir(&self, dir: &str) -> Result<PathBuf> {
         let path = self.path(dir);
         if path.exists() {
             std::fs::remove_dir_all(&path)?;
         }
         std::fs::create_dir_all(&path)?;
+        Ok(path)
+    }
+
+    pub fn save_shards<'a, T: Serialize + 'a>(
+        &self,
+        dir: &str,
+        shards: impl Iterator<Item = (String, &'a T)>,
+    ) -> Result<()> {
+        let path = self.shard_dir(dir)?;
         for (key, value) in shards {
             serde_json::to_writer(
                 BufWriter::new(File::create(path.join(format!("{key}.json")))?),

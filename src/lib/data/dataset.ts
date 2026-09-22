@@ -1,7 +1,7 @@
 import { Names } from "$lib/core/strings";
-import { readTable, strings } from "$lib/core/table";
+import { readTable, runs, strings, values } from "$lib/core/table";
 
-import { dataUrl, fetchColumn, fetchGz, fetchJson, setDataVersion } from "./fetch";
+import { fetchColumn, fetchGz, fetchJson, setDataVersion } from "./fetch";
 import type { Manifest } from "./manifest";
 import NamesWorker from "./names.worker?worker";
 import type { NamesRequest, NamesResponse } from "./names.worker";
@@ -44,7 +44,16 @@ export type NodeText = {
   s?: number[];
 };
 
-export type SearchEntry = { n: string; c: number; k: number; i: number; t?: number[]; a?: string };
+export type SearchEntry = {
+  name: string;
+  postCount: number;
+  category: number;
+  // the node this row points at, or -1 for a tag that never became one
+  node: number;
+  tail: number[];
+  // set only on an alias row, naming the tag it redirects to
+  alias?: string;
+};
 
 export type ChangelogEntry = {
   id: number;
@@ -180,9 +189,26 @@ const searchCache = new Map<string, Promise<SearchEntry[]>>();
 export const loadSearchShard = (key: string): Promise<SearchEntry[]> => {
   let p = searchCache.get(key);
   if (!p) {
-    p = fetch(dataUrl(`search/${key}.json`)).then((res) =>
-      res.ok ? (res.json() as Promise<SearchEntry[]>) : []
-    );
+    p = fetchGz(`search/${key}.bin.gz`)
+      .then((buffer) => {
+        const t = readTable(buffer);
+        const name = t.getChild("name");
+        const alias = t.getChild("alias");
+        const postCount = values<Uint32Array>(t, "post_count");
+        const category = values<Uint8Array>(t, "category");
+        const node = values<Int32Array>(t, "node");
+        const tail = runs<Uint32Array>(t, "tail");
+        return Array.from({ length: t.numRows }, (_, r) => ({
+          name: name?.get(r) ?? "",
+          postCount: postCount[r],
+          category: category[r],
+          node: node[r],
+          tail: Array.from(tail.values.subarray(tail.off[r], tail.off[r + 1])),
+          alias: alias?.get(r) ?? undefined
+        }));
+      })
+      // no shard means no tag starts with those two characters
+      .catch(() => []);
     searchCache.set(key, p);
   }
   return p;

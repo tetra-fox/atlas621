@@ -381,8 +381,8 @@
   };
 
   const onpick = (entry: SearchEntry) => {
-    if (entry.i >= 0) flyTo(entry.i);
-    else if (entry.t && entry.t.length > 0) flyTo(entry.t[0]);
+    if (entry.node >= 0) flyTo(entry.node);
+    else if (entry.tail.length > 0) flyTo(entry.tail[0]);
   };
 
   const onviewport = (v: { x: number; y: number; zoom: number }) => {

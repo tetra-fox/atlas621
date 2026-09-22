@@ -1,20 +1,48 @@
 use std::collections::BTreeMap;
 
-use serde::{Deserialize, Serialize};
+use atlas_core::ipc::{self, Column};
 
 use crate::tags::Tags;
 
-// one field name per letter: these shards are json the browser downloads per search
-#[derive(Serialize, Deserialize)]
 pub struct Entry {
-    pub n: String,
-    pub c: u32,
-    pub k: u8,
-    pub i: i32,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub t: Vec<u32>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub a: Option<String>,
+    pub name: String,
+    pub post_count: u32,
+    pub category: u8,
+    // the node this row points at, or -1 for a tag that never became one
+    pub node: i32,
+    pub tail: Vec<u32>,
+    // set only on an alias row, naming the tag it redirects to
+    pub alias: Option<String>,
+}
+
+pub fn write_shard<W: std::io::Write>(w: W, rows: &[Entry]) -> anyhow::Result<()> {
+    let column = |f: fn(&Entry) -> u32| rows.iter().map(f).collect::<Vec<u32>>();
+    ipc::write(
+        w,
+        &[
+            (
+                "name",
+                ipc::strings(&rows.iter().map(|e| e.name.clone()).collect::<Vec<_>>()),
+            ),
+            ("post_count", u32::column(&column(|e| e.post_count))),
+            (
+                "category",
+                u8::column(&rows.iter().map(|e| e.category).collect::<Vec<_>>()),
+            ),
+            (
+                "node",
+                i32::column(&rows.iter().map(|e| e.node).collect::<Vec<_>>()),
+            ),
+            (
+                "tail",
+                ipc::lists(&rows.iter().map(|e| e.tail.clone()).collect::<Vec<_>>())?,
+            ),
+            (
+                "alias",
+                ipc::maybe_strings(&rows.iter().map(|e| e.alias.clone()).collect::<Vec<_>>()),
+            ),
+        ],
+    )
 }
 
 pub fn shard_key(name: &str) -> String {
@@ -49,27 +77,27 @@ pub fn build(
     };
     for (idx, name) in tags.names.iter().enumerate() {
         shards.entry(shard_key(name)).or_default().push(Entry {
-            n: name.clone(),
-            c: tags.post_counts[idx],
-            k: tags.categories[idx],
-            i: if idx < tags.n_nodes { idx as i32 } else { -1 },
-            t: neighbors(idx),
-            a: None,
+            name: name.clone(),
+            post_count: tags.post_counts[idx],
+            category: tags.categories[idx],
+            node: if idx < tags.n_nodes { idx as i32 } else { -1 },
+            tail: neighbors(idx),
+            alias: None,
         });
     }
     for (from, target) in aliases {
         let t = *target as usize;
         shards.entry(shard_key(from)).or_default().push(Entry {
-            n: from.clone(),
-            c: tags.post_counts[t],
-            k: tags.categories[t],
-            i: if t < tags.n_nodes { t as i32 } else { -1 },
-            t: neighbors(t),
-            a: Some(tags.names[t].clone()),
+            name: from.clone(),
+            post_count: tags.post_counts[t],
+            category: tags.categories[t],
+            node: if t < tags.n_nodes { t as i32 } else { -1 },
+            tail: neighbors(t),
+            alias: Some(tags.names[t].clone()),
         });
     }
     for list in shards.values_mut() {
-        list.sort_by(|a, b| a.n.cmp(&b.n).then(b.c.cmp(&a.c)));
+        list.sort_by(|a, b| a.name.cmp(&b.name).then(b.post_count.cmp(&a.post_count)));
     }
     shards
 }
@@ -85,5 +113,50 @@ mod tests {
         assert_eq!(shard_key(":3"), "_3");
         assert_eq!(shard_key("ñandu"), "_a");
         assert_eq!(shard_key(""), "__");
+    }
+}
+
+#[cfg(test)]
+mod shard_tests {
+    use super::*;
+
+    #[test]
+    fn a_shard_round_trips_through_arrow() {
+        let rows = vec![
+            Entry {
+                name: "dragon".into(),
+                post_count: 1234,
+                category: 0,
+                node: 7,
+                tail: vec![],
+                alias: None,
+            },
+            Entry {
+                name: "dragons".into(),
+                post_count: 1234,
+                category: 5,
+                node: -1,
+                tail: vec![7, 9],
+                alias: Some("dragon".into()),
+            },
+        ];
+        let mut buf = Vec::new();
+        write_shard(&mut buf, &rows).unwrap();
+        assert!(buf.starts_with(b"ARROW1"));
+
+        let batch = atlas_core::ipc::first_batch(&buf).unwrap();
+        assert_eq!(batch.num_rows(), 2);
+        let names: Vec<String> = atlas_core::ipc::read_strings(&buf, "name").unwrap();
+        assert_eq!(names, vec!["dragon", "dragons"]);
+        let schema: Vec<String> = batch
+            .schema()
+            .fields()
+            .iter()
+            .map(|f| format!("{}:{}{}", f.name(), f.data_type(), if f.is_nullable() { "?" } else { "" }))
+            .collect();
+        assert_eq!(
+            schema.join(" "),
+            "name:Utf8 post_count:UInt32 category:UInt8 node:Int32 tail:List(non-null UInt32) alias:Utf8?"
+        );
     }
 }

@@ -536,8 +536,17 @@ fn text(ctx: &Ctx, args: &TextArgs) -> Result<()> {
     let shards = search::build(&tags, &out.aliases, &tail, edges_meta.tail_neighbors);
     let entries: usize = shards.values().map(Vec::len).sum();
     tracing::info!("{} search shards, {entries} entries", shards.len());
-    ctx.store
-        .save_shards("search", shards.iter().map(|(k, v)| (k.clone(), v)))
+    let dir = ctx.store.shard_dir("search")?;
+    for (key, rows) in &shards {
+        let file = std::fs::File::create(dir.join(format!("{key}.bin.gz")))?;
+        let mut gz = flate2::write::GzEncoder::new(
+            std::io::BufWriter::new(file),
+            flate2::Compression::best(),
+        );
+        search::write_shard(&mut gz, rows)?;
+        gz.finish()?;
+    }
+    Ok(())
 }
 
 fn emit(ctx: &Ctx, args: &EmitArgs) -> Result<()> {

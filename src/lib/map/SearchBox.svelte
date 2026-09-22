@@ -28,7 +28,7 @@
     open = found.length > 0 || value.trim().length > 0;
   };
 
-  const keyOf = (r: SearchResult) => `${r.n}\n${r.a ?? ""}`;
+  const keyOf = (r: SearchResult) => `${r.name}\n${r.alias ?? ""}`;
 
   let picked = $state("");
   const onValueChange = (value: string) => {
@@ -65,17 +65,17 @@
       {#each results as r (keyOf(r))}
         <Combobox.Item
           value={keyOf(r)}
-          label={r.a ?? r.n}
+          label={r.alias ?? r.name}
           class="flex cursor-pointer items-baseline gap-2 px-2 py-0.5 text-sm active:bg-ground data-highlighted:bg-section-dark">
-          <span class="truncate" style:color={categoryCss(r.k)}>{r.n}</span>
-          {#if r.a}
+          <span class="truncate" style:color={categoryCss(r.category)}>{r.name}</span>
+          {#if r.alias}
             <ArrowRight class="size-3 shrink-0 self-center text-muted" aria-hidden="true" />
-            <span class="truncate text-xs text-muted">{r.a}</span>
+            <span class="truncate text-xs text-muted">{r.alias}</span>
           {/if}
           <span class="ml-auto shrink-0 text-xs text-muted">
-            {formatCount(r.c)}{r.i < 0 ? " · off map" : ""}
+            {formatCount(r.postCount)}{r.node < 0 ? " · off map" : ""}
           </span>
-          <span class="sr-only">{CATEGORY_NAMES[r.k]}</span>
+          <span class="sr-only">{CATEGORY_NAMES[r.category]}</span>
         </Combobox.Item>
       {/each}
     </Combobox.Content>

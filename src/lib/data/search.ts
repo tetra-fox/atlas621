@@ -14,10 +14,11 @@ export const topByCount = (
   limit = 30
 ): SearchResult[] =>
   Array.from({ length: Math.min(limit, names.length) }, (_, i) => ({
-    n: names.at(i),
-    c: postCounts[i],
-    k: categories[i],
-    i,
+    name: names.at(i),
+    postCount: postCounts[i],
+    category: categories[i],
+    node: i,
+    tail: [],
     prefix: false
   }));
 
@@ -26,7 +27,7 @@ export const search = async (rawQuery: string, limit = 30): Promise<SearchResult
   if (query.length === 0) return [];
   const entries = await loadSearchShard(shardKey(query));
   if (entries.length === 0) return [];
-  const names = entries.map((e) => e.n);
+  const names = entries.map((e) => e.name);
   const seen = new Set<number>();
   const out: SearchResult[] = [];
   const take = (idx: number, prefix: boolean) => {
@@ -43,7 +44,7 @@ export const search = async (rawQuery: string, limit = 30): Promise<SearchResult
   }
   const prefixed: number[] = [];
   for (let i = lo; i < names.length && names[i].startsWith(query); i++) prefixed.push(i);
-  prefixed.sort((a, b) => entries[b].c - entries[a].c);
+  prefixed.sort((a, b) => entries[b].postCount - entries[a].postCount);
   for (const i of prefixed.slice(0, limit)) take(i, true);
   if (out.length < limit && query.length >= 3) {
     const idxs = fuzzy.filter(names, query);
@@ -52,7 +53,7 @@ export const search = async (rawQuery: string, limit = 30): Promise<SearchResult
         idxs.length <= 2000
           ? fuzzy.sort(fuzzy.info(idxs, names, query), names, query).map((o) => idxs[o])
           : idxs;
-      const byCount = [...ranked].sort((a, b) => entries[b].c - entries[a].c);
+      const byCount = [...ranked].sort((a, b) => entries[b].postCount - entries[a].postCount);
       for (const i of byCount) {
         if (out.length >= limit) break;
         take(i, false);

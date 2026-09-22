@@ -97,13 +97,13 @@ const lookup = async (text: string): Promise<SearchEntry[]> => {
   if (prefix.length < 2) return [];
   const entries = await loadSearchShard(shardKey(prefix));
   if (star < 0) {
-    const hit = entries.find((e) => e.n === text);
-    return hit && hit.i >= 0 ? [hit] : [];
+    const hit = entries.find((e) => e.name === text);
+    return hit && hit.node >= 0 ? [hit] : [];
   }
   const pattern = globToRegex(text);
   return entries
-    .filter((e) => e.i >= 0 && e.a === undefined && pattern.test(e.n))
-    .sort((a, b) => b.c - a.c)
+    .filter((e) => e.node >= 0 && e.alias === undefined && pattern.test(e.name))
+    .sort((a, b) => b.postCount - a.postCount)
     .slice(0, WILDCARD_LIMIT);
 };
 

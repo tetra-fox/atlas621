@@ -3,7 +3,8 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use arrow::array::{
-    ArrayRef, Float32Array, Int8Array, StringArray, UInt8Array, UInt16Array, UInt32Array,
+    ArrayRef, Float32Array, Int8Array, Int32Array, StringArray, UInt8Array, UInt16Array,
+    UInt32Array,
 };
 use arrow::buffer::OffsetBuffer;
 use arrow::datatypes::{DataType, Field, Schema};
@@ -28,9 +29,43 @@ column!(u16, UInt16Array);
 column!(u32, UInt32Array);
 column!(f32, Float32Array);
 column!(i8, Int8Array);
+column!(i32, Int32Array);
 
 pub fn strings(values: &[String]) -> ArrayRef {
     Arc::new(StringArray::from_iter_values(values))
+}
+
+pub fn maybe_strings(values: &[Option<String>]) -> ArrayRef {
+    Arc::new(StringArray::from_iter(values.iter().map(Option::as_deref)))
+}
+
+// one ragged row per entry, flattened into arrow's offsets plus values
+pub fn lists<T: Column>(rows: &[Vec<T>]) -> Result<ArrayRef> {
+    let mut offsets = Vec::with_capacity(rows.len() + 1);
+    let mut flat = Vec::new();
+    offsets.push(0u32);
+    for row in rows {
+        flat.extend_from_slice(row);
+        offsets.push(flat.len() as u32);
+    }
+    runs(&offsets, &flat)
+}
+
+pub fn string_lists(rows: &[Vec<String>]) -> Result<ArrayRef> {
+    let field = Arc::new(Field::new("item", DataType::Utf8, false));
+    let mut offsets = Vec::with_capacity(rows.len() + 1);
+    let mut flat: Vec<&str> = Vec::new();
+    offsets.push(0i32);
+    for row in rows {
+        flat.extend(row.iter().map(String::as_str));
+        offsets.push(flat.len() as i32);
+    }
+    Ok(Arc::new(arrow::array::ListArray::try_new(
+        field,
+        OffsetBuffer::new(offsets.into()),
+        Arc::new(StringArray::from(flat)),
+        None,
+    )?))
 }
 
 // a ragged run per row, stored as arrow offsets over one flat values buffer, which is the same
@@ -64,7 +99,7 @@ fn element_type<T: Column>() -> DataType {
 pub fn write<W: Write>(w: W, columns: &[(&str, ArrayRef)]) -> Result<()> {
     let fields: Vec<Field> = columns
         .iter()
-        .map(|(name, a)| Field::new(*name, a.data_type().clone(), false))
+        .map(|(name, a)| Field::new(*name, a.data_type().clone(), a.null_count() > 0))
         .collect();
     let schema = Arc::new(Schema::new(fields));
     let arrays: Vec<ArrayRef> = columns.iter().map(|(_, a)| Arc::clone(a)).collect();
@@ -78,7 +113,7 @@ pub fn one<T: Column>(w: impl Write, name: &str, values: &[T]) -> Result<()> {
     write(w, &[(name, T::column(values))])
 }
 
-fn first_batch(bytes: &[u8]) -> Result<RecordBatch> {
+pub fn first_batch(bytes: &[u8]) -> Result<RecordBatch> {
     let mut reader = arrow::ipc::reader::FileReader::try_new(std::io::Cursor::new(bytes), None)?;
     reader
         .next()
