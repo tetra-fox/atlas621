@@ -6,4 +6,4 @@ allowBuilds:
   sharp: true
 minimumReleaseAge: 1440
 patchedDependencies:
-  "@cosmos.gl/graph@3.4.1": patches/@cosmos.gl__graph@3.4.1.patch
+  "@cosmos.gl/graph@3.4.2": patches/@cosmos.gl__graph@3.4.2.patch

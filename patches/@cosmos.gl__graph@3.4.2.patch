@@ -1,0 +1,514 @@
+diff --git a/dist/index.d.ts b/dist/index.d.ts
+index fc80b38b6b45a6b84174a99bae11b52e58ab8fb8..78705f8c2c62ce40af12dee0a6537609d3bd7c7f 100644
+--- a/dist/index.d.ts
++++ b/dist/index.d.ts
+@@ -266,6 +266,14 @@ export declare class Graph {
+      * where `source` and `target` are the indices of the points being linked.
+      * Example: `new Float32Array([0, 1, 1, 2])` creates a link from point 0 to point 1 and another link from point 1 to point 2.
+      */
++    /**
++     * Replace `links.length / 2` links starting at `startLink`, leaving the rest of the
++     * link buffer alone. The total link count must not change. Returns false when the
++     * buffers cannot be patched and a full `setLinks` is needed instead.
++     */
++    setLinksRange(links: Float32Array, startLink: number): boolean;
++    /** Same, for link colors: `colors.length / 4` links starting at `startLink`. */
++    setLinkColorsRange(colors: Float32Array, startLink: number): boolean;
+     setLinks(links: Float32Array): void;
+     /**
+      * Sets the colors for the graph links.
+@@ -304,7 +312,7 @@ export declare class Graph {
+      * in the format [arrow1, arrow2, ..., arrown], where `n` is the index of the link.
+      * Example: `[true, false, true]` sets arrows on the first and third links, but not on the second link.
+      */
+-    setLinkArrows(linkArrows: boolean[]): void;
++    setLinkArrows(linkArrows?: boolean[]): void;
+     /**
+      * Sets the styles (stroke patterns) for the graph links.
+      *
+@@ -314,7 +322,7 @@ export declare class Graph {
+      * Invalid values fall back to the `linkDefaultStyle` config value.
+      * Dash length and gap are controlled globally via the `linkDashLength` and `linkDashGap` config options.
+      */
+-    setLinkStyles(linkStyles: Float32Array): void;
++    setLinkStyles(linkStyles?: Float32Array): void;
+     /**
+      * Gets the current styles of the graph links.
+      *
+diff --git a/dist/index.js b/dist/index.js
+index 029661a0eccb602a7a28094450f250dc95e0a3d8..93cc8eb7283f8a9ba43eee91ec4f787a19804235 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -522,8 +522,35 @@ class Dt {
+     }
+     this.inputPointClusters === void 0 || this.inputPointClusters.length !== this.pointsNumber ? this.pointClusters = void 0 : this.pointClusters = this.inputPointClusters, this.inputClusterPositions === void 0 ? this.clusterPositions = void 0 : this.clusterPositions = this.inputClusterPositions, this.inputClusterStrength === void 0 || this.inputClusterStrength.length !== this.pointsNumber ? this.clusterStrength = void 0 : this.clusterStrength = this.inputClusterStrength;
+   }
++  /**
++   * Added downstream: each pass below is a function of one input array, the point or
++   * link count, and config defaults that `setConfigPartial` re-runs the pass for on its
++   * own. The stock update ran every pass on every render, which walked 878k points and
++   * 598k links to validate values that had not changed, 17 ms with nothing to do; a pass
++   * now runs only when its input or its count is a different object than last time.
++   */
++  _stale(key, value, countChanged) {
++    const stale = countChanged || this[key] !== value;
++    return this[key] = value, stale;
++  }
+   update() {
+-    this.updatePoints(), this.updatePointColor(), this.updatePointSize(), this.updatePointShape(), this.updatePointImageIndices(), this.updatePointImageSizes(), this.updateLinks(), this.updateLinkColor(), this.updateLinkWidth(), this.updateArrows(), this.updateLinkStyles(), this.updateLinkStrength(), this.updateClusters(), this._createAdjacencyLists(), this._calculateDegrees();
++    this.updatePoints();
++    const np = this.pointsNumber !== this._memoPoints;
++    this._memoPoints = this.pointsNumber;
++    this._stale("_memoPointColors", this.inputPointColors, np) && this.updatePointColor();
++    const sizes = this._stale("_memoPointSizes", this.inputPointSizes, np);
++    sizes && this.updatePointSize();
++    this._stale("_memoPointShapes", this.inputPointShapes, np) && this.updatePointShape();
++    this._stale("_memoImageIndices", this.inputPointImageIndices, np) && this.updatePointImageIndices();
++    (this._stale("_memoImageSizes", this.inputPointImageSizes, np) || sizes) && this.updatePointImageSizes();
++    this.updateLinks();
++    const nl = this.linksNumber !== this._memoLinks;
++    this._memoLinks = this.linksNumber;
++    this._stale("_memoLinkColors", this.inputLinkColors, nl) && this.updateLinkColor();
++    this._stale("_memoLinkWidths", this.inputLinkWidths, nl) && this.updateLinkWidth();
++    this._stale("_memoArrows", this.linkArrowsBoolean, nl) && this.updateArrows();
++    this._stale("_memoLinkStyles", this.inputLinkStyles, nl) && this.updateLinkStyles();
++    this.updateLinkStrength(), this.updateClusters(), (this._adjacencyLinks !== this.links || this._adjacencyPoints !== this.pointsNumber) && (this._adjacencyLinks = this.links, this._adjacencyPoints = this.pointsNumber, this._createAdjacencyLists(), this._calculateDegrees());
+   }
+   /**
+    * Returns unique point indices that are neighbors of the given point(s) —
+@@ -884,6 +911,7 @@ class V {
+ }
+ const _t = `#version 300 es
+ precision highp float;
++precision highp sampler2D;
+ 
+ in vec4 rgba;
+ out vec4 fragColor;
+@@ -892,6 +920,7 @@ void main() {
+   fragColor = rgba;
+ }`, Et = `#version 300 es
+ precision highp float;
++precision highp sampler2D;
+ 
+ uniform sampler2D positionsTexture;
+ uniform sampler2D exitTexture;
+@@ -922,6 +951,7 @@ void main() {
+ }
+ `, Ot = `#version 300 es
+ precision highp float;
++precision highp sampler2D;
+ 
+ uniform sampler2D positionsTexture;
+ uniform sampler2D centermassTexture;
+@@ -1006,6 +1036,7 @@ function P(a, e) {
+ const D = `#version 300 es
+ #ifdef GL_ES
+ precision highp float;
++precision highp sampler2D;
+ #endif
+ 
+ in vec2 vertexCoord; // Vertex coordinates in normalized device coordinates
+@@ -1147,6 +1178,7 @@ class Te extends V {
+ }
+ const Vt = `#version 300 es
+ precision highp float;
++precision highp sampler2D;
+ 
+ uniform sampler2D positionsTexture;
+ uniform sampler2D sizeTexture;
+@@ -1209,6 +1241,7 @@ void main() {
+ }
+ `, Gt = `#version 300 es
+ precision highp float;
++precision highp sampler2D;
+ 
+ in vec4 cellData;
+ out vec4 fragColor;
+@@ -1220,6 +1253,7 @@ void main() {
+ }
+ `, Wt = `#version 300 es
+ precision highp float;
++precision highp sampler2D;
+ 
+ uniform sampler2D positionsTexture;
+ uniform sampler2D sizeTexture;
+@@ -1596,6 +1630,7 @@ class ze extends V {
+ }
+ const Ht = `#version 300 es
+ precision highp float;
++precision highp sampler2D;
+ 
+ uniform sampler2D positionsTexture;
+ 
+@@ -1704,6 +1739,7 @@ class we extends V {
+ function Xt(a) {
+   return `#version 300 es
+ precision highp float;
++precision highp sampler2D;
+ 
+ uniform sampler2D positionsTexture;
+ uniform sampler2D exitTexture;
+@@ -1952,6 +1988,7 @@ class K extends V {
+ }
+ const Yt = `#version 300 es
+ precision highp float;
++precision highp sampler2D;
+ 
+ in vec4 vColor;
+ out vec4 fragColor;
+@@ -1960,6 +1997,7 @@ void main() {
+   fragColor = vColor;
+ }`, qt = `#version 300 es
+ precision highp float;
++precision highp sampler2D;
+ 
+ // Aggregates each point into its grid cell. A level is a plain 2D grid of
+ // \`levelGridSize\` cells per axis rendered one texel per cell; additive blending
+@@ -2013,6 +2051,7 @@ void main() {
+ }
+ `, Zt = `#version 300 es
+ precision highp float;
++precision highp sampler2D;
+ 
+ // One grid level of precise many-body repulsion (Barnes-Hut-style approximation).
+ //
+@@ -2111,6 +2150,7 @@ void main() {
+ }
+ `, jt = `#version 300 es
+ precision highp float;
++precision highp sampler2D;
+ // Fragment shaders default int to mediump, guaranteed only to 32767 —
+ // point indices go far higher.
+ precision highp int;
+@@ -2270,6 +2310,7 @@ void main() {
+ }
+ `, Kt = `#version 300 es
+ precision highp float;
++precision highp sampler2D;
+ // Fragment shaders default int to mediump, guaranteed only to 32767 —
+ // point indices go far higher.
+ precision highp int;
+@@ -2385,6 +2426,7 @@ void main() {
+ }
+ `, $t = `#version 300 es
+ precision highp float;
++precision highp sampler2D;
+ 
+ // One depth-peeling pass of the near-field point-slot build.
+ //
+@@ -2488,6 +2530,7 @@ void main() {
+ }
+ `, Qt = `#version 300 es
+ precision highp float;
++precision highp sampler2D;
+ 
+ in vec2 slotData;
+ out vec4 fragColor;
+@@ -3015,6 +3058,7 @@ class Ie extends V {
+ }
+ const ii = `#version 300 es
+ precision highp float;
++precision highp sampler2D;
+ 
+ uniform sampler2D positionsTexture;
+ 
+@@ -3116,6 +3160,7 @@ class Le extends V {
+ const ni = `#version 300 es
+ #ifdef GL_ES
+ precision highp float;
++precision highp sampler2D;
+ #endif
+ 
+ in vec4 rgba;
+@@ -3127,6 +3172,7 @@ void main() {
+ }`, oi = `#version 300 es
+ #ifdef GL_ES
+ precision highp float;
++precision highp sampler2D;
+ #endif
+ 
+ uniform sampler2D positionsTexture;
+@@ -3180,6 +3226,7 @@ void main() {
+ `, si = `#version 300 es
+ #ifdef GL_ES
+ precision highp float;
++precision highp sampler2D;
+ #endif
+ 
+ uniform sampler2D positionsTexture;
+@@ -3564,6 +3611,7 @@ vec2 conicParametricCurve(vec2 A, vec2 B, vec2 ControlPoint, float t, float w) {
+ }, di = `#version 300 es
+ #ifdef GL_ES
+ precision highp float;
++precision highp sampler2D;
+ #endif
+ 
+ in vec4 rgbaColor;
+@@ -3727,6 +3775,7 @@ void main() {
+ `, hi = `#version 300 es
+ #ifdef GL_ES
+ precision highp float;
++precision highp sampler2D;
+ #endif
+ 
+ in vec2 position, pointA, pointB;
+@@ -3940,6 +3989,17 @@ void main() {
+     return;
+   }
+ 
++  // A link is only as visible as its endpoints, the same rule the absence check above
++  // applies: a point hidden by setting its color alpha to zero should not leave its links
++  // drawn. Collapse off-screen rather than fading, so a hidden link costs no fragments.
++  // A NaN alpha means "use the default color" and is left alone. Added downstream.
++  vec4 endpointAlphaA = texelFetch(pointColorsTexture, pointTexelA, 0);
++  vec4 endpointAlphaB = texelFetch(pointColorsTexture, pointTexelB, 0);
++  if (endpointAlphaA.a <= 0.0 || endpointAlphaB.a <= 0.0) {
++    gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
++    return;
++  }
++
+   // Sample the source/target point colors so the fragment shader can build a gradient
+   // along the link. Skipped entirely when the gradient is off — the fragment shader
+   // only reads these varyings inside its own gradient branch, keyed on the same flag.
+@@ -3952,6 +4012,14 @@ void main() {
+ 
+   // Calculate direction vector and its perpendicular
+   vec2 xBasis = b - a;
++  // A zero length link, both ends on the same point or two points at the same position,
++  // would normalize a zero vector here and put NaN in every vertex, which rasterizes as
++  // garbage rather than as nothing. Collapse it off-screen the way an absent endpoint is
++  // collapsed above. Added downstream.
++  if (dot(xBasis, xBasis) <= 0.0) {
++    gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
++    return;
++  }
+   vec2 yBasis = normalize(vec2(-xBasis.y, xBasis.x));
+ 
+   // Calculate link distance and control point for curved link
+@@ -4119,6 +4187,7 @@ void main() {
+ }`, ui = `#version 300 es
+ #ifdef GL_ES
+ precision highp float;
++precision highp sampler2D;
+ #endif
+ 
+ in vec4 rgba;
+@@ -4131,6 +4200,7 @@ void main() {
+ `, ci = `#version 300 es
+ #ifdef GL_ES
+ precision highp float;
++precision highp sampler2D;
+ #endif
+ 
+ in vec2 pointA;
+@@ -4592,6 +4662,47 @@ class vi extends V {
+       linkIndices: this.linkIndexBuffer
+     }), this.updateSampledLinksGrid(), this.config.highlightedLinkIndices !== void 0 && this.updateLinkStatus();
+   }
++  /**
++   * Rewrite one contiguous run of links in place. Added downstream: the stock path
++   * rebuilds and reuploads every link on any change, so holding a large static set and
++   * swapping a small tail of it costs the whole buffer. Endpoint texel coords only —
++   * widths, arrows, styles and the link index buffer are untouched, so the run must keep
++   * the same link count. Returns false when the buffers are not in a state to be patched
++   * and the caller should fall back to a full update.
++   */
++  writeLinksRange(start, count) {
++    const { data: t, store: i } = this;
++    if (!this.pointABuffer || this.pointABuffer.destroyed) return !1;
++    if (!this.pointBBuffer || this.pointBBuffer.destroyed) return !1;
++    if (!i.pointsTextureSize || t.links === void 0) return !1;
++    if (start < 0 || count < 0 || start + count > (t.linksNumber ?? 0)) return !1;
++    const n = new Float32Array(count * 2), o = new Float32Array(count * 2);
++    for (let h = 0; h < count; h++) {
++      const d = start + h, u = t.links[d * 2], l = t.links[d * 2 + 1],
++        p = t.isPointIndex(u) && t.isPointIndex(l), c = p ? u : 0, v = p ? l : 0;
++      n[h * 2] = c % i.pointsTextureSize, n[h * 2 + 1] = Math.floor(c / i.pointsTextureSize);
++      o[h * 2] = v % i.pointsTextureSize, o[h * 2 + 1] = Math.floor(v / i.pointsTextureSize);
++    }
++    const y = start * 2 * Float32Array.BYTES_PER_ELEMENT;
++    return this.pointABuffer.write(n, y), this.pointBBuffer.write(o, y),
++      this.isLinkIndexBufferStale = !0, this.discardPendingPick(), !0;
++  }
++  /**
++   * Rewrite one contiguous run of link colors in place. Both ends of the color transition
++   * get the same values, so a patched run does not interpolate out of whatever the slots
++   * held before.
++   */
++  writeLinkColorsRange(start, count) {
++    const { data: t } = this, e = t.linkColors;
++    if (!e || !this.sourceColorBuffer || this.sourceColorBuffer.destroyed) return !1;
++    if (!this.targetColorBuffer || this.targetColorBuffer.destroyed) return !1;
++    if (start < 0 || count < 0 || (start + count) * 4 > e.length) return !1;
++    const n = e.subarray(start * 4, (start + count) * 4),
++      y = start * 4 * Float32Array.BYTES_PER_ELEMENT;
++    return this.sourceColorBuffer.write(n, y), this.targetColorBuffer.write(n, y),
++      this.previousColorData && this.previousColorData.set(n, start * 4),
++      this.isLinkIndexBufferStale = !0, !0;
++  }
+   updateColor() {
+     const { data: e } = this, t = e.linksNumber ?? 0;
+     this.isLinkIndexBufferStale = !0;
+@@ -4992,6 +5103,7 @@ class vi extends V {
+ const Ue = `#version 300 es
+ #ifdef GL_ES
+ precision highp float;
++precision highp sampler2D;
+ #endif
+ 
+ uniform sampler2D imageAtlasTexture;
+@@ -5328,6 +5440,7 @@ void main() {
+ `, Me = `#version 300 es
+ #ifdef GL_ES
+ precision highp float;
++precision highp sampler2D;
+ #endif
+ 
+ in vec2 pointIndices;
+@@ -5580,6 +5693,7 @@ void main() {
+ `, Si = `#version 300 es
+ #ifdef GL_ES
+ precision highp float;
++precision highp sampler2D;
+ #endif
+ 
+ uniform sampler2D positionsTexture;
+@@ -5670,6 +5784,7 @@ void main() {
+ `, Pi = `#version 300 es
+ #ifdef GL_ES
+ precision highp float;
++precision highp sampler2D;
+ #endif
+ 
+ uniform sampler2D positionsTexture;
+@@ -5764,6 +5879,7 @@ void main() {
+ } `, yi = `#version 300 es
+ #ifdef GL_ES
+ precision highp float;
++precision highp sampler2D;
+ #endif
+ 
+ #ifdef USE_UNIFORM_BUFFERS
+@@ -5821,6 +5937,7 @@ void main () {
+ }`, Ci = `#version 300 es
+ #ifdef GL_ES
+ precision highp float;
++precision highp sampler2D;
+ #endif
+ 
+ in vec2 vertexCoord;
+@@ -6001,6 +6118,7 @@ void main () {
+ }`, ki = `#version 300 es
+ #ifdef GL_ES
+ precision highp float;
++precision highp sampler2D;
+ #endif
+ 
+ in vec4 rgba;
+@@ -6016,6 +6134,7 @@ void main() {
+ `, bi = `#version 300 es
+ #ifdef GL_ES
+ precision highp float;
++precision highp sampler2D;
+ #endif
+ 
+ // Fills the screen-space picking buffer: every point rasterizes its sprite at
+@@ -6196,6 +6315,7 @@ float transitionedSize(float sourceSize, float targetSize, float animateSizes, f
+ }, zi = `#version 300 es
+ #ifdef GL_ES
+ precision highp float;
++precision highp sampler2D;
+ #endif
+ 
+ in vec4 rgba;
+@@ -6207,6 +6327,7 @@ void main() {
+ }`, wi = `#version 300 es
+ #ifdef GL_ES
+ precision highp float;
++precision highp sampler2D;
+ #endif
+ 
+ in vec2 pointIndices;
+@@ -6268,6 +6389,7 @@ void main() {
+ }`, Fi = `#version 300 es
+ #ifdef GL_ES
+ precision highp float;
++precision highp sampler2D;
+ #endif
+ 
+ uniform sampler2D positionsTexture;
+@@ -6327,6 +6449,7 @@ void main() {
+ }`, Ii = `#version 300 es
+ #ifdef GL_ES
+ precision highp float;
++precision highp sampler2D;
+ #endif
+ 
+ uniform sampler2D sourceTexture;
+@@ -6362,6 +6485,7 @@ void main() {
+ `, Li = `#version 300 es
+ #ifdef GL_ES
+ precision highp float;
++precision highp sampler2D;
+ // Fragment shaders default int to mediump, guaranteed only to 32767 —
+ // point indices go far higher.
+ precision highp int;
+@@ -6394,6 +6518,7 @@ void main() {
+ `, Di = `#version 300 es
+ #ifdef GL_ES
+ precision highp float;
++precision highp sampler2D;
+ #endif
+ 
+ uniform sampler2D positionsTexture;
+@@ -7114,7 +7239,7 @@ class Ni extends V {
+       ...this.sourceColorBuffer && { sourceColor: this.sourceColorBuffer },
+       ...this.targetColorBuffer && { targetColor: this.targetColorBuffer }
+     };
+-    if (this.drawCommand && this.drawCommand.setAttributes(d), this.drawCoreCommand && this.drawCoreCommand.setAttributes(d), this.config.linkColorInterpolateFromEndpoints) {
++    if (this.drawCommand && this.drawCommand.setAttributes(d), this.drawCoreCommand && this.drawCoreCommand.setAttributes(d), !0) {
+       const h = new Float32Array(t * t * 4);
+       h.set(n.subarray(0, Math.min(n.length, h.length))), (!this.pointColorsTexture || this.pointColorsTexture.width !== t || this.pointColorsTexture.height !== t) && (this.pointColorsTexture && !this.pointColorsTexture.destroyed && this.pointColorsTexture.destroy(), this.pointColorsTexture = e.createTexture({
+         width: t,
+@@ -8558,6 +8683,32 @@ class on {
+    * where `source` and `target` are the indices of the points being linked.
+    * Example: `new Float32Array([0, 1, 1, 2])` creates a link from point 0 to point 1 and another link from point 1 to point 2.
+    */
++  /**
++   * Replace `links.length / 2` links starting at `startLink`, without touching the rest.
++   * Added downstream. The link count must not change; this is for swapping a reserved run
++   * of a set that is otherwise held across frames. The force-link data is deliberately not
++   * rebuilt, so a simulation reading links will use the pre-patch set until a full
++   * setLinks; that is fine when the patched run only affects what is drawn.
++   */
++  setLinksRange(links, startLink) {
++    if (this._isDestroyed || !this.lines || this.graph.links === void 0) return !1;
++    if ((startLink + links.length / 2) > (this.graph.linksNumber ?? 0)) return !1;
++    return this.graph.links.set(links, startLink * 2),
++      this.graph.inputLinks !== this.graph.links && this.graph.inputLinks &&
++        this.graph.inputLinks.set(links, startLink * 2),
++      this.lines.writeLinksRange(startLink, links.length / 2)
++        ? (this.markPickingBuffersStale(), this.requestRender(), !0)
++        : !1;
++  }
++  /** Same, for link colors: `colors.length / 4` links starting at `startLink`. */
++  setLinkColorsRange(colors, startLink) {
++    if (this._isDestroyed || !this.lines || this.graph.linkColors === void 0) return !1;
++    if ((startLink + colors.length / 4) > (this.graph.linksNumber ?? 0)) return !1;
++    return this.graph.linkColors.set(colors, startLink * 4),
++      this.lines.writeLinkColorsRange(startLink, colors.length / 4)
++        ? (this.requestRender(), !0)
++        : !1;
++  }
+   setLinks(e) {
+     this._isDestroyed || this.ensureDevice(() => this.setLinks(e)) || (this.graph.inputLinks = e, this.isLinksUpdateNeeded = !0, this.isLinkColorUpdateNeeded = !0, this.isLinkWidthUpdateNeeded = !0, this.isLinkArrowUpdateNeeded = !0, this.isLinkStyleUpdateNeeded = !0, this.isForceLinkUpdateNeeded = !0);
+   }
+@@ -9259,7 +9410,7 @@ class on {
+     if (!o) return;
+     this.isRightClickMouse && this.config.enableRightClickRepulsion && ((h = this.points) == null || h.swapFbo(), (u = this.forceMouse) == null || u.run(), (l = this.points) == null || l.updatePosition(), this.markPickingBuffersStale());
+     const r = this.zoomInstance.shouldEnableSimulationDuringZoomOverride ?? this.config.enableSimulationDuringZoom;
+-    (e || s && !(this.zoomInstance.isRunning && !r)) && (t && ((c = this.points) == null || c.swapFbo(), (f = this.forceGravity) == null || f.run(), (p = this.points) == null || p.updatePosition()), i && ((v = this.points) == null || v.swapFbo(), (C = this.forceCenter) == null || C.run(), (g = this.points) == null || g.updatePosition()), (S = this.points) == null || S.swapFbo(), (b = this.forceManyBody) == null || b.run(), (L = this.points) == null || L.updatePosition(), this.store.linksTextureSize && ((F = this.points) == null || F.swapFbo(), (I = this.forceLinkIncoming) == null || I.run(), (R = this.points) == null || R.updatePosition(), (N = this.points) == null || N.swapFbo(), (_ = this.forceLinkOutgoing) == null || _.run(), (ae = this.points) == null || ae.updatePosition()), (this.graph.pointClusters || this.graph.clusterPositions) && ((le = this.points) == null || le.swapFbo(), (de = this.clusters) == null || de.run(), (he = this.points) == null || he.updatePosition()), n && (this.isForceCollisionReady || ((ue = this.forceCollision) == null || ue.create(), (ce = this.forceCollision) == null || ce.initPrograms(), this.isForceCollisionReady = !0), (fe = this.points) == null || fe.swapFbo(), (pe = this.forceCollision) == null || pe.run(), (me = this.points) == null || me.updatePosition()), this.markPickingBuffersStale(), this.store.alpha += this.store.addAlpha(this.config.simulationDecay), this.isRightClickMouse && this.config.enableRightClickRepulsion && (this.store.alpha = Math.max(this.store.alpha, 0.1)), this.store.simulationProgress = Math.sqrt(Math.min(1, ne / this.store.alpha)), (Se = (ve = this.config).onSimulationTick) == null || Se.call(
++    (e || s && !(this.zoomInstance.isRunning && !r)) && (t && ((c = this.points) == null || c.swapFbo(), (f = this.forceGravity) == null || f.run(), (p = this.points) == null || p.updatePosition()), i && ((v = this.points) == null || v.swapFbo(), (C = this.forceCenter) == null || C.run(), (g = this.points) == null || g.updatePosition()), this.config.simulationRepulsion !== 0 && ((S = this.points) == null || S.swapFbo(), (b = this.forceManyBody) == null || b.run(), (L = this.points) == null || L.updatePosition()), this.store.linksTextureSize && ((F = this.points) == null || F.swapFbo(), (I = this.forceLinkIncoming) == null || I.run(), (R = this.points) == null || R.updatePosition(), (N = this.points) == null || N.swapFbo(), (_ = this.forceLinkOutgoing) == null || _.run(), (ae = this.points) == null || ae.updatePosition()), (this.graph.pointClusters || this.graph.clusterPositions) && ((le = this.points) == null || le.swapFbo(), (de = this.clusters) == null || de.run(), (he = this.points) == null || he.updatePosition()), n && (this.isForceCollisionReady || ((ue = this.forceCollision) == null || ue.create(), (ce = this.forceCollision) == null || ce.initPrograms(), this.isForceCollisionReady = !0), (fe = this.points) == null || fe.swapFbo(), (pe = this.forceCollision) == null || pe.run(), (me = this.points) == null || me.updatePosition()), this.markPickingBuffersStale(), this.store.alpha += this.store.addAlpha(this.config.simulationDecay), this.isRightClickMouse && this.config.enableRightClickRepulsion && (this.store.alpha = Math.max(this.store.alpha, 0.1)), this.store.simulationProgress = Math.sqrt(Math.min(1, ne / this.store.alpha)), (Se = (ve = this.config).onSimulationTick) == null || Se.call(
+       ve,
+       this.store.alpha,
+       (ge = this.store.hoveredPoint) == null ? void 0 : ge.index,
