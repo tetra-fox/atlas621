@@ -1,6 +1,7 @@
 import { sveltekit } from "@sveltejs/kit/vite";
 import tailwindcss from "@tailwindcss/vite";
-import { defineConfig, type Plugin } from "vite";
+import type { Plugin } from "vite";
+import { defineConfig } from "vitest/config";
 
 const jsProfiling = (): Plugin => ({
   name: "js-profiling-header",
@@ -20,5 +21,10 @@ export default defineConfig(({ command }) => ({
   build: {
     target: "es2025"
   },
-  esbuild: command === "build" ? { drop: ["console", "debugger"] } : {}
+  ...(command === "build" ? { esbuild: { drop: ["console", "debugger"] } } : {}),
+  test: {
+    // unit tests sit next to what they cover; anything needing a real canvas or layout is not
+    // covered here, node has neither
+    include: ["src/**/*.test.ts"]
+  }
 }));
