@@ -6,10 +6,15 @@
   type Props = { current: "map" | "playground" | "changelog"; children?: Snippet };
   let { current, children }: Props = $props();
 
+  // the playground route still resolves, it just does not get a tab
   const sections = [
     { id: "map", label: "map", href: resolve("/(map)") },
-    { id: "playground", label: "playground", href: resolve("/playground") },
     { id: "changelog", label: "changelog", href: resolve("/changelog") }
+  ] as const;
+
+  const links = [
+    { label: "e621", href: "https://e621.net", end: false },
+    { label: "source", href: "https://github.com/tetra-fox/atlas621", end: true }
   ] as const;
 </script>
 
@@ -41,14 +46,16 @@
             aria-current={current === s.id ? "page" : undefined}>{s.label}</a>
         </li>
       {/each}
-      <li>
-        <a
-          href="https://e621.net"
-          target="_blank"
-          rel="noopener"
-          class="flex h-6 items-center gap-1 rounded-t-sm px-2.5 hover:bg-page/60 active:bg-page"
-          >e621 <ExternalLink class="size-3" aria-hidden="true" /></a>
-      </li>
+      {#each links as l (l.href)}
+        <li class={[l.end && "ml-auto"]}>
+          <a
+            href={l.href}
+            target="_blank"
+            rel="noopener"
+            class="flex h-6 items-center gap-1 rounded-t-sm px-2.5 hover:bg-page/60 active:bg-page"
+            >{l.label} <ExternalLink class="size-3" aria-hidden="true" /></a>
+        </li>
+      {/each}
     </menu>
     <div
       class={[
