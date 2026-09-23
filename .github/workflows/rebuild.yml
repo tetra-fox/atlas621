@@ -12,7 +12,7 @@ permissions:
 jobs:
   dataset:
     runs-on: ubuntu-latest
-    timeout-minutes: 350
+    timeout-minutes: 120
     concurrency:
       group: rebuild
       cancel-in-progress: false
@@ -29,20 +29,6 @@ jobs:
         with:
           path: previous
 
-      - name: make room for the intermediates
-        run: |
-          df -h / /mnt && free -h
-          # the exports and the stage outputs come to tens of gb, which only the temp disk has
-          sudo mkdir -p /mnt/atlas
-          sudo chown "$(id -u):$(id -g)" /mnt/atlas
-          # count holds the pair table in memory, past what a 16 gb runner has, so give it swap
-          # rather than let it be killed partway through
-          sudo fallocate -l 32G /mnt/atlas.swap
-          sudo chmod 600 /mnt/atlas.swap
-          sudo mkswap /mnt/atlas.swap
-          sudo swapon /mnt/atlas.swap
-          swapon --show
-
       - run: cargo build --release --manifest-path pipeline/Cargo.toml
 
       - name: run the pipeline
@@ -53,10 +39,9 @@ jobs:
           else
             echo "no previous dataset, cold start"
           fi
-          ./pipeline/target/release/atlas621 \
-            --cache-dir /mnt/atlas/exports \
-            --work-dir /mnt/atlas/work \
-            all "${seed[@]}"
+          # peak rss measured at 8.8 gb against the runner's 16, and the pair map capacity is
+          # tuned to a pair count that grows every month, so each run reports where it landed
+          /usr/bin/time -v ./pipeline/target/release/atlas621 all "${seed[@]}"
 
       - name: pack the dataset
         run: tar -cf dataset.tar -C static data
